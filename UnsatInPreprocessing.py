@@ -1,0 +1,2 @@
+class UnsatInPreprocessing(Exception):
+    pass

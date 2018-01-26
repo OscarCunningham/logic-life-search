@@ -1,0 +1,174 @@
+#! /usr/bin/python2
+
+from SearchPattern import SearchPattern
+from LLS_messages import print_message
+import LLS_search_patterns, LLS_rules
+import argparse
+import LLS
+import copy
+import LLS_files
+import sys
+from LLS_literal_manipulation import negate, variable_from_literal
+
+
+parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
+parser.add_argument('input_file_name', nargs='?', default = None, help = "Name of file containing search pattern")
+parser.add_argument('-b','--blank_search_pattern' , nargs = "+", type = int, metavar = ("BOUNDS"), default = None,
+                    help = """\
+Creates a blank_search_pattern with size
+BOUND_1 by BOUND_2, and duration BOUND_3.
+If BOUND_3 isn't present, assume duration
+is period + 1. If BOUND_2 isn't present,
+assume bounding box is square.\
+                           """)
+parser.add_argument('--check_orphan',nargs = "+", default = None, help = "Check if specified pattern is an orphan. Extra numerical argument to check several generations back.")
+parser.add_argument('-a','--agar_crawler_search_pattern' , nargs = "+", type = int, metavar = ("BOUNDS"), default = None,
+                    help = """\
+Creates a search patter with size
+BOUND_1 by BOUND_2 in the zebra-stripes agar.\
+                           """)
+parser.add_argument('--agar_offset' , action = "store_true", help = 'Forces the stripes in the zebra agar to be black and white rather than white and black' )
+parser.add_argument('-s','--symmetry' , default = "C1",
+                    help = """\
+Impose a symmetry on the pattern, valid inputs are:
+                          "C1" - no symmetry (default),
+                          "C2" - 180 degree rotational symmetry,
+                          "C4" -  90 degree rotational symmetry,
+    "D2-", "D2/", "D2|", "D2\\" - reflection symmetry about given axis,
+                  "D4+", "D4X" - reflection symmetry about given axes,
+                          "D8" - reflection symmetry about all axes\
+                          """)
+parser.add_argument('-p','--period' , type = int, default = None, help = 'Forces the input to have period PERIOD' )
+parser.add_argument('-x','--x_translate' , type = int, default = None, help = 'Used with --period, means that the pattern will be translated that far each period' )
+parser.add_argument('-y','--y_translate' , type = int, default = None, help = 'Used with --period, means that the pattern will be translated that far each period' )
+parser.add_argument('-i','--force_nonempty' , action = "store_true", help = 'Forces the first generation to have at least one live cell' )
+parser.add_argument('-m','--force_movement' , action = "store_true", help = 'Forces the first two generations to be different' )
+parser.add_argument('-o','--output_file_name', default = None, help = 'File for the output to be saved to' )
+parser.add_argument('-M','--method' , type=int, default = None, help = 'Which method to encode transitions in CNF' )
+parser.add_argument('-S', '--solver', default = None, help = 'Which SAT solver to use' )
+parser.add_argument('-t','--timeout' , type=int, default = None, help = 'Program will time out if the solver runs for longet than TIMEOUT seconds' )
+parser.add_argument('--csv' , action='store_const', default = None, const = "csv", help = "Give output in csv format rather than the usual RLE.")
+parser.add_argument('-V','--version' , action = "store_true", help = 'Displays the version number' )
+parser.add_argument('-v', '--verbosity', type = int, default = 2,
+                    help = """\
+Set the verbosity. Options:
+    0 - No output. Only useful with -o option to save solution to file.
+    1 - Only display the solution.
+    2 - Displays some information about what the program is doing, some statistics, and the solution. (Default)
+    3 - A huge torrent of information.\
+                            """)
+parser.add_argument("-c", "--force_change", action = 'append', nargs = 2, type=int, default = [], metavar = ("GEN_0", "GEN_1"), help = "Forces there to be at least one cell difference between the specified generations")
+parser.add_argument("--force_at_least", action = 'append', nargs = "+", type=int, default = [], metavar = ("AMOUNT", "GEN_0"), help = "Forces there to be at least AMOUNT live cells in the first generation or in the specified generations combined")
+parser.add_argument("--force_at_most", action = 'append', nargs = "+", type=int, default = [], metavar = ("AMOUNT", "GEN_0"), help = "Forces there to be at most AMOUNT live cells in the first generation or in the specified generations combined")
+parser.add_argument("-n", "--number_of_solutions", nargs="?", default = None, const = "Infinity", help = "Number of solutions to find, or (if no number is given) all of them.")
+parser.add_argument("--save_dimacs", nargs="?", default = None, const = True, help = "Save the DIMACS file (to the given filename, or to a default if one isn't given)")
+parser.add_argument("--dry_run", action = "store_true", help = "Doesn't run the solver, but does preprocess.")
+parser.add_argument('--parameters' , type = str, default = None, help = 'Parameters to pass to the SAT solver. Note that you have to use the format like --parameters="-nthreads=8", or else Python\'s argparse will have a hissy fit.' )
+parser.add_argument("-r", '--rule' , type = str, default = None, help = 'Which rule to use' )
+
+args = parser.parse_args()
+
+indent = 0
+verbosity = args.verbosity
+
+print_message('', indent = indent, verbosity = verbosity)
+
+if args.version:
+    print_message('Version 0', 1, indent = indent, verbosity = verbosity)
+
+print_message('Getting search pattern...', indent = indent, verbosity = verbosity)
+
+
+number_of_search_patterns = sum(map(bool, [args.input_file_name, args.blank_search_pattern, args.agar_crawler_search_pattern, args.check_orphan]))
+assert number_of_search_patterns < 2, "Too many search patterns specified"
+
+ignore_transition = None
+rule = LLS_rules.rule_from_rulestring(args.rule, indent = indent + 1, verbosity = verbosity)
+
+if args.rule != None and args.rule.strip()[0] == "{":
+    for transition, literal in rule.items():
+        variable, negated = variable_from_literal(literal)
+        literal = negate("user_input_" + variable, negated)
+        rule[transition] = literal
+
+if args.input_file_name:
+    print_message('Creating search pattern from file "' + args.input_file_name +'" ...', 3, indent = indent + 1, verbosity = verbosity)
+    input_string = LLS_files.string_from_file(args.input_file_name, indent = indent + 2, verbosity = verbosity)
+    grid, ignore_transition = LLS_search_patterns.search_pattern_from_string(input_string, indent = indent+2, verbosity = verbosity)
+    print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
+if args.blank_search_pattern:
+    assert len(args.blank_search_pattern) in range(1,4), "Wrong number of arguments for bounding box"
+    if len(args.blank_search_pattern) == 1:
+        width = args.blank_search_pattern[0]
+        height = args.blank_search_pattern[0]
+        duration = (args.period + 1) if (args.period != None) else 2
+    elif len(args.blank_search_pattern) == 2:
+        width = args.blank_search_pattern[0]
+        height = args.blank_search_pattern[1]
+        duration = (args.period + 1) if (args.period != None) else 2
+    elif len(args.blank_search_pattern) == 3:
+        width = args.blank_search_pattern[0]
+        height = args.blank_search_pattern[1]
+        duration = args.blank_search_pattern[2]
+
+    grid = LLS_search_patterns.blank_search_pattern(width, height, duration, indent = indent+1, verbosity = verbosity)
+if args.agar_crawler_search_pattern:
+    assert len(args.agar_crawler_search_pattern) in range(1,3), "Wrong number of arguments for bounding box"
+    if args.x_translate == None:
+        args.x_translate = 0
+    if args.y_translate == None:
+        args.y_translate = 0
+    if args.period == None:
+        args.period = 0
+    if len(args.agar_crawler_search_pattern) == 1:
+        width = args.agar_crawler_search_pattern[0]
+        height = args.agar_crawler_search_pattern[0]
+    elif len(args.agar_crawler_search_pattern) == 2:
+        width = args.agar_crawler_search_pattern[0]
+        height = args.agar_crawler_search_pattern[1]
+
+    grid, ignore_transition = LLS_search_patterns.crawler_search_pattern(width, height, args.x_translate, args.y_translate, args.period, args.agar_offset, indent = indent+1, verbosity = verbosity)
+    args.x_translate = None
+    args.y_translate = None
+    args.period = None
+if args.check_orphan:
+    file_name = args.check_orphan[0]
+    if len(args.check_orphan) == 2:
+        number_of_generations = int(args.check_orphan[1])
+    else:
+        number_of_generations = 1
+    grid, ignore_transition = LLS_search_patterns.check_orphan(file_name, number_of_generations, indent = indent+1, verbosity = verbosity)
+if number_of_search_patterns == 0:
+    print_message('\nNo pattern specified, getting from STDIN... (End with EOF character)\n', 2, indent = indent + 1, verbosity = verbosity)
+    input_string = sys.stdin.read()
+    print_message('\n', 1, indent = indent + 1, verbosity = verbosity)
+    grid, ignore_transition = LLS_search_patterns.search_pattern_from_string(input_string, indent = indent + 1, verbosity = verbosity)
+
+
+search_pattern = SearchPattern(grid, ignore_transition = ignore_transition, rule = rule, indent = indent + 1, verbosity = verbosity)
+
+print_message('Done\n', indent = indent, verbosity = verbosity)
+
+LLS.preprocess_solve_and_postprocess(
+    search_pattern,
+    symmetry = args.symmetry,
+    period = args.period,
+    x_translate = args.x_translate,
+    y_translate = args.y_translate,
+    force_movement = args.force_movement,
+    solver = args.solver,
+    parameters = args.parameters,
+    timeout = args.timeout,
+    save_dimacs = args.save_dimacs,
+    method = args.method,
+    force_at_most = args.force_at_most,
+    force_at_least = args.force_at_least,
+    force_change = args.force_change,
+    force_nonempty = args.force_nonempty,
+    force_evolution = True,
+    dry_run = args.dry_run,
+    number_of_solutions = args.number_of_solutions,
+    pattern_output_format = args.csv,
+    output_file_name = args.output_file_name,
+    indent = indent, verbosity = verbosity
+)
