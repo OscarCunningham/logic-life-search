@@ -1,6 +1,6 @@
 #! /usr/bin/python2
 
-import argparse, sys, copy
+import argparse, sys
 import src.LLS, src.LLS_search_patterns, src.LLS_rules, src.LLS_files
 from src.LLS_literal_manipulation import negate, variable_from_literal
 from src.SearchPattern import SearchPattern

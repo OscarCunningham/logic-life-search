@@ -6,7 +6,6 @@ from LLS_messages import print_message
 import LLS_DIMACS
 import LLS_SAT_solvers
 from UnsatInPreprocessing import UnsatInPreprocessing
-import copy
 from LLS_literal_manipulation import negate
 
 def preprocess_solve_and_postprocess(search_pattern,
