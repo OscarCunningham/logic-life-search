@@ -1,6 +1,6 @@
 #! /usr/bin/python2
 
-import argparse, sys
+import argparse, sys, os
 import src.LLS, src.LLS_search_patterns, src.LLS_rules, src.LLS_files
 from src.LLS_literal_manipulation import negate, variable_from_literal
 from src.SearchPattern import SearchPattern
@@ -8,7 +8,7 @@ from src.LLS_messages import print_message
 
 
 parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument('input_file_name', nargs='?', default = None, help = "Name of file containing search pattern")
+parser.add_argument('input_file_name', nargs='?', default = None, help = "Name of file containing search pattern. LLS looks in current directory and then search_patterns")
 parser.add_argument('-b','--blank_search_pattern' , nargs = "+", type = int, metavar = ("BOUNDS"), default = None,
                     help = """\
 Creates a blank_search_pattern with size
@@ -115,7 +115,12 @@ if args.rule != None and args.rule.strip()[0] == "{":
 
 if args.input_file_name:
     print_message('Creating search pattern from file "' + args.input_file_name +'" ...', 3, indent = indent + 1, verbosity = verbosity)
-    input_string = src.LLS_files.string_from_file(args.input_file_name, indent = indent + 2, verbosity = verbosity)
+    if os.path.isfile(args.input_file_name):
+        input_string = src.LLS_files.string_from_file(args.input_file_name, indent = indent + 2, verbosity = verbosity)
+    elif os.path.isfile("search_patterns/" + args.input_file_name):
+        input_string = src.LLS_files.string_from_file("search_patterns/" + args.input_file_name, indent = indent + 2, verbosity = verbosity)
+    else:
+        assert False, "Search pattern file not found"
     grid, ignore_transition = src.LLS_search_patterns.search_pattern_from_string(input_string, indent = indent+2, verbosity = verbosity)
     print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
 if args.blank_search_pattern:
