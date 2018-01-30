@@ -1,7 +1,6 @@
-import re
-import ast
-from LLS_literal_manipulation import variable_from_literal, negate
+import re, ast
 import LLS_formatting
+from LLS_literal_manipulation import variable_from_literal, negate
 from LLS_messages import print_message
 
 

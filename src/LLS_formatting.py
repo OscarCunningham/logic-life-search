@@ -1,8 +1,7 @@
-from LLS_messages import print_message
-import re
-import copy
-from LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, implies
+import re, copy
 import LLS_rules
+from LLS_messages import print_message
+from LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, implies
 
 def parse_input_string(input_string, indent = 0, verbosity = 0):
     """Transforms a "search pattern" given as a string into a SearchPattern"""

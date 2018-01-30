@@ -1,11 +1,6 @@
-import time
-import subprocess
-import threading
-import os, errno
-import sys
+import time, subprocess, threading, os, errno, sys, re
 import LLS_files
 from LLS_messages import print_message
-import re
 
 
 def SAT_solve(DIMACS_string, solver=None, parameters=None, timeout=None, save_dimacs = None, dry_run = None, indent = 0, verbosity = 0):

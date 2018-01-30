@@ -1,15 +1,8 @@
-import collections
-import copy
+import collections, copy, itertools
+import LLS_taocp_variable_scheme, LLS_formatting, LLS_rules
+from UnsatInPreprocessing import UnsatInPreprocessing
 from LLS_messages import print_message
 from LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, neighbour_indices_from_coordinates, implies
-import LLS_taocp_variable_scheme
-import LLS_DIMACS
-import LLS_SAT_solvers
-import re
-import itertools
-import LLS_formatting
-import LLS_rules
-from UnsatInPreprocessing import UnsatInPreprocessing
 
 class SearchPattern:
     def __init__(self, grid, ignore_transition = None, clauses = None, rule = None, indent = 0, verbosity = 0):

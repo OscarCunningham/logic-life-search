@@ -1,10 +1,7 @@
+import copy
+import LLS_files, LLS_formatting
 from SearchPattern import SearchPattern
 from LLS_messages import print_message
-import LLS_files
-import LLS_formatting
-import copy
-import itertools
-import re
 from LLS_literal_manipulation import neighbour_indices_from_coordinates, variable_from_literal, negate
 
 

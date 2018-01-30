@@ -1,11 +1,7 @@
-
-import LLS_files
-import LLS_formatting
+import LLS_files, LLS_formatting, LLS_DIMACS, LLS_SAT_solvers
 from SearchPattern import SearchPattern
-from LLS_messages import print_message
-import LLS_DIMACS
-import LLS_SAT_solvers
 from UnsatInPreprocessing import UnsatInPreprocessing
+from LLS_messages import print_message
 from LLS_literal_manipulation import negate
 
 def preprocess_solve_and_postprocess(search_pattern,

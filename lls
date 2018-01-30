@@ -2,8 +2,8 @@
 
 import argparse, sys, os
 import src.LLS, src.LLS_search_patterns, src.LLS_rules, src.LLS_files
-from src.LLS_literal_manipulation import negate, variable_from_literal
 from src.SearchPattern import SearchPattern
+from src.LLS_literal_manipulation import negate, variable_from_literal
 from src.LLS_messages import print_message
 
 

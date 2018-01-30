@@ -1,5 +1,3 @@
-import re
-
 def negate(literal, flag = True, DIMACS = False):
     """The negation of the given literal"""
 
