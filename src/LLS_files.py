@@ -1,8 +1,7 @@
 from LLS_messages import print_message
 
 
-
-def string_from_file(file_name, indent = 0, verbosity = 0):
+def string_from_file(file_name, indent=0, verbosity=0):
     """Read pattern file into string"""
     print_message('Reading file "' + file_name + '" ...', 3, indent = indent, verbosity = verbosity)
     with open(file_name, "r") as pattern_file:

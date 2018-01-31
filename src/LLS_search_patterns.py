@@ -1,14 +1,20 @@
 import copy
-import LLS_files, LLS_formatting
+import LLS_files
+import LLS_formatting
 from SearchPattern import SearchPattern
 from LLS_messages import print_message
 from LLS_literal_manipulation import neighbour_indices_from_coordinates, variable_from_literal, negate
 
 
 def search_pattern_from_string(input_string, indent = 0, verbosity = 0):
+    """Create the grid and ignore_transitionof a search pattern from the given string"""
     grid, ignore_transition = LLS_formatting.parse_input_string(input_string, indent = indent, verbosity = verbosity)
 
-    print_message("Pattern parsed as:\n" + LLS_formatting.make_csv(grid, ignore_transition) + "\n", 3, indent = indent, verbosity = verbosity)
+    print_message(
+        "Pattern parsed as:\n" + LLS_formatting.make_csv(grid, ignore_transition) + "\n",
+        3,
+        indent = indent, verbosity = verbosity
+    )
 
     for t, generation in enumerate(grid):
         for y, row in enumerate(generation):
@@ -27,8 +33,7 @@ def blank_search_pattern(x_bound, y_bound, duration, indent = 0, verbosity = 0):
     width = x_bound + 2
     height = y_bound + 2
 
-    grid = [[["0"
-        for i in range(width)] for j in range(height)] for k in range(duration)]
+    grid = [[["0" for i in range(width)] for j in range(height)] for k in range(duration)]
 
     for t in range(duration):
         for y in range(y_bound):
@@ -40,7 +45,15 @@ def blank_search_pattern(x_bound, y_bound, duration, indent = 0, verbosity = 0):
     return grid
 
 
-def crawler_search_pattern(x_bound, y_bound, x_translate, y_translate, period, offset = False, indent = 0, verbosity = 0):
+def crawler_search_pattern(
+    x_bound,
+    y_bound,
+    x_translate,
+    y_translate,
+    period,
+    offset = False,
+    indent = 0, verbosity = 0
+):
     print_message('Creating agar crawler search pattern...', 3, indent = indent, verbosity = verbosity)
 
     width = x_translate + x_bound + 4
@@ -52,10 +65,18 @@ def crawler_search_pattern(x_bound, y_bound, x_translate, y_translate, period, o
     else:
         booleans = ("1","0")
 
-    grid = [[[booleans[0] if y % 2 == 0 else booleans[1] for x in range(
-        width)] for y in range(height)] for generation in range(duration)]
-    ignore_transition = [[[False for x in range(
-        width)] for y in range(height)] for generation in range(duration)]
+    grid = [[[
+        booleans[0] if y % 2 == 0 else booleans[1]
+        for x in range(width)]
+        for y in range(height)]
+        for generation in range(duration)
+    ]
+    ignore_transition = [[[
+        False
+        for x in range(width)]
+        for y in range(height)]
+        for generation in range(duration)
+    ]
 
     for x in range(width):
         for y in range(height):
@@ -86,19 +107,32 @@ def crawler_search_pattern(x_bound, y_bound, x_translate, y_translate, period, o
     search_pattern.force_equal(to_force_equal)
 
     search_pattern.standardise_varaibles_names(indent = indent + 1, verbosity = verbosity)
-    print_message("Pattern created:\n" + search_pattern.make_string(pattern_output_format = "csv") + "\n", 3, indent = indent+1, verbosity = verbosity)
+    print_message(
+        "Pattern created:\n" + search_pattern.make_string(pattern_output_format = "csv") + "\n",
+        3,
+        indent = indent+1, verbosity = verbosity
+    )
     print_message('Done\n', 3, indent = indent, verbosity = verbosity)
 
     return search_pattern.grid, search_pattern.ignore_transition
 
+
 def check_orphan(file_name, number_of_generations, indent = 0, verbosity = 0):
-    print_message('Creating search pattern to see if file "' + file_name + '" contains an orphan...', 3, indent = indent, verbosity = verbosity)
+    print_message(
+        'Creating search pattern to see if file "' + file_name + '" contains an orphan...',
+        3,
+        indent = indent, verbosity = verbosity
+    )
     input_string = LLS_files.string_from_file(file_name, indent = indent + 1, verbosity = verbosity)
     grid, _ = LLS_formatting.parse_input_string(input_string, indent = indent + 1, verbosity = verbosity)
     assert len(grid) == 1, "More than one generation in input"
-    print_message("Pattern parsed as:\n" + LLS_formatting.make_csv(grid) + "\n", 3, indent = indent+1, verbosity = verbosity)
-    pattern = grid[0]
+    print_message(
+        "Pattern parsed as:\n" + LLS_formatting.make_csv(grid) + "\n",
+        3,
+        indent = indent+1, verbosity = verbosity
+    )
 
+    pattern = grid[0]
     width = len(pattern[0])
     height = len(pattern)
 
@@ -138,6 +172,7 @@ def check_orphan(file_name, number_of_generations, indent = 0, verbosity = 0):
     print_message("Search pattern:\n" + LLS_formatting.make_csv(grid, ignore_transition) + "\n", 3, indent = indent+1, verbosity = verbosity)
     print_message('Done\n', 3, indent = indent, verbosity = verbosity)
     return grid, ignore_transition
+
 
 def glider_eater_search_pattern(width,height,digestion_time,symmetry="C1",indent = 0, verbosity = 0):
     print_message('Creating eater search pattern...', 3, indent = indent, verbosity = verbosity)

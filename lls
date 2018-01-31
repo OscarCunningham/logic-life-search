@@ -1,93 +1,183 @@
 #! /usr/bin/python2
 
-import argparse, sys, os
-import src.LLS, src.LLS_search_patterns, src.LLS_rules, src.LLS_files
+"""Handles the command line input and passes it to LLS_main"""
+
+import argparse
+import sys
+import os
+import src.LLS_main
+import src.LLS_search_patterns
+import src.LLS_rules
+import src.LLS_files
 from src.SearchPattern import SearchPattern
 from src.LLS_literal_manipulation import negate, variable_from_literal
 from src.LLS_messages import print_message
 
-
-parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-parser.add_argument('input_file_name', nargs='?', default = None, help = "Name of file containing search pattern. LLS looks in current directory and then search_patterns")
-parser.add_argument('-b','--blank_search_pattern' , nargs = "+", type = int, metavar = ("BOUNDS"), default = None,
-                    help = """\
-Creates a blank_search_pattern with size
-BOUND_1 by BOUND_2, and duration BOUND_3.
-If BOUND_3 isn't present, assume duration
-is period + 1. If BOUND_2 isn't present,
-assume bounding box is square.\
-                           """)
-parser.add_argument('--check_orphan',nargs = "+", default = None, help = '''Creates a search pattern to check if the pattern in the given file is an orphan. Extra numerical argument to check several generations back. The file format is "1" for alive, "0" for dead, "*" for don't-care''')
-parser.add_argument('-a','--agar_crawler_search_pattern' , nargs = "+", type = int, metavar = ("BOUNDS"), default = None,
-                    help = """\
-Creates a search patter with size
-BOUND_1 by BOUND_2 in the zebra-stripes agar.
-Duration is period + 1.\
-                           """)
-parser.add_argument('--agar_offset' , action = "store_true", help = 'Forces the stripes in the zebra agar to be black and white rather than white and black' )
-parser.add_argument('-s','--symmetry' , default = "C1",
-                    help = """\
-Impose a symmetry on the pattern, valid inputs are:
-                          "C1" - no symmetry (default),
-                          "C2" - 180 degree rotational symmetry,
-                          "C4" -  90 degree rotational symmetry,
-    "D2-", "D2/", "D2|", "D2\\" - reflection symmetry about given axis,
-                  "D4+", "D4X" - reflection symmetry about given axes,
-                          "D8" - reflection symmetry about all axes\
-                          """)
-parser.add_argument('-p','--period' , type = int, default = None, help = 'Forces the pattern to have period PERIOD' )
-parser.add_argument('-x','--x_translate' , type = int, default = None, help = 'Used with --period, means that the pattern will be translated that far each period' )
-parser.add_argument('-y','--y_translate' , type = int, default = None, help = 'Used with --period, means that the pattern will be translated that far each period' )
-parser.add_argument('-i','--force_nonempty','--force_inhabited' , action = "store_true", help = 'Forces the first generation to have at least one live cell' )
-parser.add_argument('-m','--force_movement' , action = "store_true", help = 'Forces the first two generations to be different' )
-parser.add_argument('-o','--output_file_name', default = None, help = 'File for the output to be saved to' )
-parser.add_argument('-M','--method' , type=int, default = None, help = 'Which method to encode transitions in CNF (default is "1" for Life, and "2" otherwise)' )
-parser.add_argument('-S', '--solver', default = None, help = 'Which SAT solver to use (default is glucose-syrup)' )
-parser.add_argument('-t','--timeout' , type=int, default = None, help = 'Program will time out if the solver runs for longet than TIMEOUT seconds' )
-parser.add_argument('--csv' , action='store_const', default = None, const = "csv", help = "Give output in csv format rather than the usual RLE.")
-parser.add_argument('-V','--version' , action = "store_true", help = 'Displays the version number' )
-parser.add_argument('-v', '--verbosity', type = int, default = 2,
-                    help = """\
-Set the verbosity. Options:
-    0 - No output. Only useful with -o option to save solution to file.
-    1 - Only display the solution.
-    2 - Displays some information about what the program is doing, some statistics, and the solution. (Default)
-    3 - A huge torrent of information.\
-                            """)
-parser.add_argument("-c", "--force_change", action = 'append', nargs = 2, type=int, default = [], metavar = ("GEN_0", "GEN_1"), help = "Forces there to be at least one cell difference between the specified generations")
-parser.add_argument("--force_at_least", action = 'append', nargs = "+", type=int, default = [], metavar = ("AMOUNT", "GEN_0"), help = "Forces there to be at least AMOUNT live cells in the first generation or in the specified generations combined")
-parser.add_argument("--force_at_most", action = 'append', nargs = "+", type=int, default = [], metavar = ("AMOUNT", "GEN_0"), help = "Forces there to be at most AMOUNT live cells in the first generation or in the specified generations combined")
-parser.add_argument("-n", "--number_of_solutions", nargs="?", default = None, const = "Infinity", help = "Number of solutions to find, or (if no number is given) all of them.")
-parser.add_argument("--save_dimacs", nargs="?", default = None, const = True, help = "Save the DIMACS file (to the given filename, or to a default if one isn't given)")
-parser.add_argument("--dry_run", action = "store_true", help = "Don't run the solver, but do preprocess.")
-parser.add_argument('--parameters' , type = str, default = None, help = 'Parameters to pass to the SAT solver. Note that you have to use the format like --parameters="-nthreads=8", or else Python\'s argparse will have a hissy fit.' )
-parser.add_argument("-r", '--rule' , type = str, default = None,
-                    help = """\
-Which rule to use. Rules can also be specified as partial rules,
-by adding a "p" to the front. For example "pB3a-c/S23" allows any
-of the transitions from Life, except 3a must be present and 3c must not.
-
-Can also specify rule as a Python dictionary, like so:
-{'S4e': '0', 'S4a': '0', 'S4c': '0', 'S4n': '0', 'S4i': '0', 'S4j': '0',
-'S4k': '0', 'S4t': '0', 'S4w': '0', 'S4q': '0', 'S4r': '0', 'S4y': '0',
-'S4z': '0', 'B2n': '0', 'B2k': '0', 'B2i': '0', 'B2e': '0', 'B2c': '0',
-'B2a': '0', 'S5e': '0', 'S5c': '0', 'S5a': '0', 'S5n': '0', 'S5k': '0',
-'S5j': '0', 'S5i': '0', 'S5r': '0', 'S5q': '0', 'S5y': '0', 'B5y': '0',
-'B5r': '0', 'B5q': '0', 'B5j': '0', 'B5k': '0', 'B5i': '0', 'B5n': '0',
-'B5c': '0', 'B5a': '0', 'B5e': '0', 'S6n': '0', 'B0c': '0', 'S6k': '0',
-'S6i': '0', 'S6e': '0', 'S6c': '0', 'S6a': '0', 'B8c': '0', 'S7c': '0',
-'S7e': '0', 'B3y': 'r_7', 'B3q': 'r_5', 'B3r': 'r_6', 'B3n': 'r_4',
-'B3i': 'r_1', 'B3j': 'r_2', 'B3k': 'r_3', 'B3e': 'r_0', 'B3a': '1',
-'B3c': '0', 'S8c': '0', 'B6c': '0', 'B6a': '0', 'B6e': '0', 'B6k': '0',
-'B6i': '0', 'S0c': '0', 'B6n': '0', 'B1e': '0', 'B1c': '0', 'S1c': '0',
-'S1e': '0', 'S2c': 'r_9', 'S2a': 'r_8', 'S2e': 'r_10', 'S2k': 'r_12',
-'S2i': 'r_11', 'S2n': 'r_13', 'B4t': '0', 'B4w': '0', 'B4q': '0',
-'B4r': '0', 'B4y': '0', 'B4z': '0', 'B4e': '0', 'S3n': 'r_20', 'B4a': '0',
-'B4c': '0', 'B4n': '0', 'B4i': '0', 'B4k': '0', 'B4j': '0', 'S3y': 'r_23',
-'S3q': 'r_21', 'S3r': 'r_22', 'B7c': '0', 'S3i': 'r_17', 'B7e': '0',
-'S3k': 'r_19', 'S3j': 'r_18', 'S3e': 'r_16', 'S3a': 'r_14', 'S3c': 'r_15'}\
-                            """)
-
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    'input_file_name',
+    nargs = '?',
+    default = None,
+    help = "Name of file containing search pattern. LLS looks in current directory and then search_patterns/"
+)
+parser.add_argument(
+    '-b', '--blank_search_pattern',
+    nargs = "+",
+    type = int,
+    metavar = ("BOUNDS"),
+    default = None,
+    help = """Creates a blank_search_pattern with size BOUND_1 by BOUND_2, and duration BOUND_3. If BOUND_3 isn't present, assume duration is period + 1. If BOUND_2 isn't present, assume bounding box is square."""
+)
+parser.add_argument(
+    '--check_orphan',
+    nargs = "+",
+    default = None,
+    help = '''Creates a search pattern to check if the pattern in the given file is an orphan. Extra numerical argument to check several generations back. The file format is "1" for alive, "0" for dead, "*" for don't-care'''
+)
+parser.add_argument(
+    '-a', '--agar_crawler_search_pattern',
+    nargs = "+",
+    type = int,
+    metavar = ("BOUNDS"),
+    default = None,
+    help = """Creates a search patter with size BOUND_1 by BOUND_2 in the zebra-stripes agar. Duration is period + 1."""
+)
+parser.add_argument(
+    '--agar_offset',
+    action = "store_true",
+    help = 'Forces the stripes in the zebra agar to be black and white rather than white and black'
+)
+parser.add_argument(
+    '-s', '--symmetry',
+    default = "C1",
+    help = """Impose a symmetry on the pattern, valid inputs are: "C1" - no symmetry (default), "C2" - 180 degree rotational symmetry, "C4" -  90 degree rotational symmetry, "D2-", "D2/", "D2|", "D2\\" - reflection symmetry about given axis, "D4+", "D4X" - reflection symmetry about given axes, "D8" - reflection symmetry about all axes"""
+)
+parser.add_argument(
+    '-p', '--period',
+    type = int,
+    default = None,
+    help = 'Forces the pattern to have period PERIOD'
+)
+parser.add_argument(
+    '-x', '--x_translate',
+    type = int,
+    default = None,
+    help = 'Used with --period, means that the pattern will be translated that far each period'
+)
+parser.add_argument(
+    '-y', '--y_translate',
+    type = int,
+    default = None,
+    help = 'Used with --period, means that the pattern will be translated that far each period'
+)
+parser.add_argument(
+    '-i', '--force_nonempty', '--force_inhabited',
+    action = "store_true",
+    help = 'Forces the first generation to have at least one live cell'
+)
+parser.add_argument(
+    '-m', '--force_movement',
+    action = "store_true",
+    help = 'Forces the first two generations to be different'
+)
+parser.add_argument(
+    '-o', '--output_file_name',
+    default = None,
+    help = 'File for the output to be saved to'
+)
+parser.add_argument(
+    '-M', '--method',
+    type = int,
+    default = None,
+    help = 'Which method to encode transitions in CNF (default is "1" for Life, and "2" otherwise)'
+)
+parser.add_argument(
+    '-S', '--solver',
+    default = None,
+    help = 'Which SAT solver to use (default is glucose-syrup)'
+)
+parser.add_argument(
+    '-t', '--timeout',
+    type = int,
+    default = None,
+    help = 'Program will time out if the solver runs for longet than TIMEOUT seconds'
+)
+parser.add_argument(
+    '--csv',
+    action = 'store_const',
+    default = None,
+    const = "csv",
+    help = "Give output in csv format rather than the usual RLE."
+)
+parser.add_argument(
+    '-V', '--version',
+    action = "store_true",
+    help = 'Displays the version number'
+)
+parser.add_argument(
+    '-v', '--verbosity',
+    type = int,
+    default = 2,
+    help = """Set the verbosity. Options: 0 - No output. Only useful with -o option to save solution to file. 1 - Only display the solution. 2 (Default) - Displays some information about what the program is doing, some statistics, and the solution. 3 - A huge torrent of information."""
+)
+parser.add_argument(
+    "-c", "--force_change",
+    action = 'append',
+    nargs = 2,
+    type = int,
+    default = [],
+    metavar = ("GEN_0", "GEN_1"),
+    help = "Forces there to be at least one cell difference between the specified generations"
+)
+parser.add_argument(
+    "--force_at_least",
+    action = 'append',
+    nargs = "+",
+    type = int,
+    default = [],
+    metavar = ("AMOUNT", "GEN_0"),
+    help = "Forces there to be at least AMOUNT live cells in the first generation or in the specified generations combined"
+)
+parser.add_argument(
+    "--force_at_most",
+    action = 'append',
+    nargs = "+",
+    type = int,
+    default = [],
+    metavar = ("AMOUNT", "GEN_0"),
+    help = "Forces there to be at most AMOUNT live cells in the first generation or in the specified generations combined"
+)
+parser.add_argument(
+    "-n", "--number_of_solutions",
+    nargs = "?",
+    default = None,
+    const = "Infinity",
+    help = "Number of solutions to find, or (if no number is given) all of them."
+)
+parser.add_argument(
+    "--save_dimacs",
+    nargs = "?",
+    default = None,
+    const = True,
+    help = "Save the DIMACS file (to the given filename, or to a default if one isn't given)"
+)
+parser.add_argument(
+    "--dry_run",
+    action = "store_true",
+    help = "Don't run the solver, but do preprocess."
+)
+parser.add_argument(
+    '--parameters',
+    type = str,
+    default = None,
+    help = 'Parameters to pass to the SAT solver. Note that you have to use the format like --parameters="-nthreads=8", or else Python\'s argparse will have a hissy fit.'
+)
+parser.add_argument(
+    "-r", '--rule',
+    type = str,
+    default = None,
+    help = """Which rule to use. Rules can also be specified as partial rules, by adding a "p" to the front. For example "pB3a-c/S23" allows any of the transitions from Life, except 3a must be present and 3c must not. Can also specify rule as a Python dictionary, like so: {'S4e': '0', 'S4a': '0', 'S4c': '0', 'S4n': '0', 'S4i': '0', 'S4j': '0', 'S4k': '0', 'S4t': '0', 'S4w': '0', 'S4q': '0', 'S4r': '0', 'S4y': '0', 'S4z': '0', 'B2n': '0', 'B2k': '0', 'B2i': '0', 'B2e': '0', 'B2c': '0', 'B2a': '0', 'S5e': '0', 'S5c': '0', 'S5a': '0', 'S5n': '0', 'S5k': '0', 'S5j': '0', 'S5i': '0', 'S5r': '0', 'S5q': '0', 'S5y': '0', 'B5y': '0', 'B5r': '0', 'B5q': '0', 'B5j': '0', 'B5k': '0', 'B5i': '0', 'B5n': '0', 'B5c': '0', 'B5a': '0', 'B5e': '0', 'S6n': '0', 'B0c': '0', 'S6k': '0', 'S6i': '0', 'S6e': '0', 'S6c': '0', 'S6a': '0', 'B8c': '0', 'S7c': '0', 'S7e': '0', 'B3y': 'r_7', 'B3q': 'r_5', 'B3r': 'r_6', 'B3n': 'r_4', 'B3i': 'r_1', 'B3j': 'r_2', 'B3k': 'r_3', 'B3e': 'r_0', 'B3a': '1', 'B3c': '0', 'S8c': '0', 'B6c': '0', 'B6a': '0', 'B6e': '0', 'B6k': '0', 'B6i': '0', 'S0c': '0', 'B6n': '0', 'B1e': '0', 'B1c': '0', 'S1c': '0', 'S1e': '0', 'S2c': 'r_9', 'S2a': 'r_8', 'S2e': 'r_10', 'S2k': 'r_12', 'S2i': 'r_11', 'S2n': 'r_13', 'B4t': '0', 'B4w': '0', 'B4q': '0', 'B4r': '0', 'B4y': '0', 'B4z': '0', 'B4e': '0', 'S3n': 'r_20', 'B4a': '0', 'B4c': '0', 'B4n': '0', 'B4i': '0', 'B4k': '0', 'B4j': '0', 'S3y': 'r_23', 'S3q': 'r_21', 'S3r': 'r_22', 'B7c': '0', 'S3i': 'r_17', 'B7e': '0', 'S3k': 'r_19', 'S3j': 'r_18', 'S3e': 'r_16', 'S3a': 'r_14', 'S3c': 'r_15'}"""
+)
 args = parser.parse_args()
 
 indent = 0
@@ -96,17 +186,22 @@ verbosity = args.verbosity
 print_message('', indent = indent, verbosity = verbosity)
 
 if args.version:
-    print_message('Version 0', 1, indent = indent, verbosity = verbosity)
+    print_message('Version 0\n', 1, indent = indent, verbosity = verbosity)
 
 print_message('Getting search pattern...', indent = indent, verbosity = verbosity)
 
-
-number_of_search_patterns = sum(map(bool, [args.input_file_name, args.blank_search_pattern, args.agar_crawler_search_pattern, args.check_orphan]))
+number_of_search_patterns = sum(map(bool, [
+    args.input_file_name,
+    args.blank_search_pattern,
+    args.agar_crawler_search_pattern,
+    args.check_orphan
+]))
 assert number_of_search_patterns < 2, "Too many search patterns specified"
 
-ignore_transition = None
+ignore_transition = None # Default value
 rule = src.LLS_rules.rule_from_rulestring(args.rule, indent = indent + 1, verbosity = verbosity)
 
+# Add "user_input_" to user's variable names, to prevent collisions"
 if args.rule != None and args.rule.strip()[0] == "{":
     for transition, literal in rule.items():
         variable, negated = variable_from_literal(literal)
@@ -114,17 +209,32 @@ if args.rule != None and args.rule.strip()[0] == "{":
         rule[transition] = literal
 
 if args.input_file_name:
-    print_message('Creating search pattern from file "' + args.input_file_name +'" ...', 3, indent = indent + 1, verbosity = verbosity)
+    #Check current directory and then search_pattern/
+    print_message(
+        'Creating search pattern from file "' + args.input_file_name + '" ...',
+        3,
+        indent = indent + 1, verbosity = verbosity
+    )
     if os.path.isfile(args.input_file_name):
-        input_string = src.LLS_files.string_from_file(args.input_file_name, indent = indent + 2, verbosity = verbosity)
+        input_string = src.LLS_files.string_from_file(
+            args.input_file_name,
+            indent = indent + 2, verbosity = verbosity
+        )
     elif os.path.isfile("search_patterns/" + args.input_file_name):
-        input_string = src.LLS_files.string_from_file("search_patterns/" + args.input_file_name, indent = indent + 2, verbosity = verbosity)
+        input_string = src.LLS_files.string_from_file(
+            "search_patterns/" + args.input_file_name,
+            indent = indent + 2, verbosity = verbosity
+        )
     else:
         assert False, "Search pattern file not found"
-    grid, ignore_transition = src.LLS_search_patterns.search_pattern_from_string(input_string, indent = indent+2, verbosity = verbosity)
+    grid, ignore_transition = src.LLS_search_patterns.search_pattern_from_string(
+        input_string,
+        indent = indent + 2, verbosity = verbosity
+    )
     print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
+
 if args.blank_search_pattern:
-    assert len(args.blank_search_pattern) in range(1,4), "Wrong number of arguments for bounding box"
+    assert len(args.blank_search_pattern) in range(1, 4), "Wrong number of arguments for bounding box"
     if len(args.blank_search_pattern) == 1:
         width = args.blank_search_pattern[0]
         height = args.blank_search_pattern[0]
@@ -137,10 +247,10 @@ if args.blank_search_pattern:
         width = args.blank_search_pattern[0]
         height = args.blank_search_pattern[1]
         duration = args.blank_search_pattern[2]
+    grid = src.LLS_search_patterns.blank_search_pattern(width, height, duration, indent = indent + 1, verbosity = verbosity)
 
-    grid = src.LLS_search_patterns.blank_search_pattern(width, height, duration, indent = indent+1, verbosity = verbosity)
 if args.agar_crawler_search_pattern:
-    assert len(args.agar_crawler_search_pattern) in range(1,3), "Wrong number of arguments for bounding box"
+    assert len(args.agar_crawler_search_pattern) in range(1, 3), "Wrong number of arguments for bounding box"
     if args.x_translate == None:
         args.x_translate = 0
     if args.y_translate == None:
@@ -153,30 +263,49 @@ if args.agar_crawler_search_pattern:
     elif len(args.agar_crawler_search_pattern) == 2:
         width = args.agar_crawler_search_pattern[0]
         height = args.agar_crawler_search_pattern[1]
-
-    grid, ignore_transition = src.LLS_search_patterns.crawler_search_pattern(width, height, args.x_translate, args.y_translate, args.period, args.agar_offset, indent = indent+1, verbosity = verbosity)
+    grid, ignore_transition = src.LLS_search_patterns.crawler_search_pattern(
+        width,
+        height,
+        args.x_translate,
+        args.y_translate,
+        args.period,
+        args.agar_offset,
+        indent = indent + 1, verbosity = verbosity
+    )
     args.x_translate = None
     args.y_translate = None
     args.period = None
+
 if args.check_orphan:
     file_name = args.check_orphan[0]
     if len(args.check_orphan) == 2:
         number_of_generations = int(args.check_orphan[1])
     else:
         number_of_generations = 1
-    grid, ignore_transition = src.LLS_search_patterns.check_orphan(file_name, number_of_generations, indent = indent+1, verbosity = verbosity)
+    grid, ignore_transition = src.LLS_search_patterns.check_orphan(file_name, number_of_generations, indent = indent + 1, verbosity = verbosity)
+
 if number_of_search_patterns == 0:
-    print_message('\nNo pattern specified, getting from STDIN... (End with EOF character)\n', 2, indent = indent + 1, verbosity = verbosity)
+    print_message(
+        '\nNo pattern specified, getting from STDIN... (End with EOF character)\n',
+        2,
+        indent = indent + 1, verbosity = verbosity
+    )
     input_string = sys.stdin.read()
     print_message('\n', 1, indent = indent + 1, verbosity = verbosity)
     grid, ignore_transition = src.LLS_search_patterns.search_pattern_from_string(input_string, indent = indent + 1, verbosity = verbosity)
 
-
-search_pattern = SearchPattern(grid, ignore_transition = ignore_transition, rule = rule, indent = indent + 1, verbosity = verbosity)
+# Create the search pattern
+search_pattern = SearchPattern(
+    grid,
+    ignore_transition = ignore_transition,
+    rule = rule,
+    indent = indent + 1, verbosity = verbosity
+)
 
 print_message('Done\n', indent = indent, verbosity = verbosity)
 
-src.LLS.preprocess_solve_and_postprocess(
+# LLS_main.LLS does all the hard work
+src.LLS_main.LLS(
     search_pattern,
     symmetry = args.symmetry,
     period = args.period,
