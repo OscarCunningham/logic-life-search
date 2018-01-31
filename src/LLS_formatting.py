@@ -1,4 +1,5 @@
-import re, copy
+import re
+import copy
 import LLS_rules
 from LLS_messages import print_message
 from LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, implies

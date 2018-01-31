@@ -1,5 +1,12 @@
-import time, subprocess, threading, os, errno, sys, re
+import time
+import subprocess
+import threading
+import os
+import errno
+import sys
+import re
 import LLS_files
+import LLS_defaults
 from LLS_messages import print_message
 
 
@@ -18,7 +25,7 @@ def SAT_solve(DIMACS_string, solver=None, parameters=None, timeout=None, save_di
         "treengeling"]
     try:
         if solver is None:
-            solver = "glucose-syrup"  # Default solver
+            solver = LLS_defaults.solver
         elif int(solver) in range(len(solvers)):
             solver = solvers[solver] # Allow solver to be specified by number
     except ValueError:

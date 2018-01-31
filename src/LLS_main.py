@@ -27,7 +27,7 @@ def LLS(
     force_evolution=True,
     dry_run=False,
     number_of_solutions=None,
-    pattern_output_format="rle",
+    pattern_output_format=None,
     output_file_name=None,
     indent=0, verbosity=0
 ):

@@ -9,6 +9,7 @@ import src.LLS_main
 import src.LLS_search_patterns
 import src.LLS_rules
 import src.LLS_files
+import src.LLS_defaults
 from src.SearchPattern import SearchPattern
 from src.LLS_literal_manipulation import negate, variable_from_literal
 from src.LLS_messages import print_message
@@ -117,7 +118,7 @@ parser.add_argument(
 parser.add_argument(
     '-v', '--verbosity',
     type = int,
-    default = 2,
+    default = src.LLS_defaults.verbosity,
     help = """Set the verbosity. Options: 0 - No output. Only useful with -o option to save solution to file. 1 - Only display the solution. 2 (Default) - Displays some information about what the program is doing, some statistics, and the solution. 3 - A huge torrent of information."""
 )
 parser.add_argument(

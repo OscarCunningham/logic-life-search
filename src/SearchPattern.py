@@ -1,5 +1,10 @@
-import collections, copy, itertools
-import LLS_taocp_variable_scheme, LLS_formatting, LLS_rules
+import collections
+import copy
+import itertools
+import LLS_taocp_variable_scheme
+import LLS_formatting
+import LLS_rules
+import LLS_defaults
 from UnsatInPreprocessing import UnsatInPreprocessing
 from LLS_messages import print_message
 from LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, implies
@@ -16,7 +21,7 @@ class SearchPattern:
                                   else [])
         self.rule = (copy.deepcopy(rule)
                                   if (rule != None)
-                                  else LLS_rules.rule_from_rulestring("B3/S23"))
+                                  else LLS_rules.rule_from_rulestring(LLS_defaults.rule))
         assert len(self.grid) == len(self.ignore_transition), "Durations of grid and ignore_transition don't match"
         assert len(self.grid[0]) == len(self.ignore_transition[0]), "Heights of grid and ignore_transition don't match"
         assert len(self.grid[0][0]) == len(self.ignore_transition[0][0]), "Widths of grid and ignore_transition don't match"
@@ -295,7 +300,7 @@ class SearchPattern:
 
         if method is None:
             if LLS_rules.rulestring_from_rule(self.rule) == "B3/S23":
-                method = 1 # Optimal method for Life
+                method = LLS_defaults.life_encoding_method
             else:
                 method = 2 # Default method
         assert method in range(3), "Method not found"
@@ -751,7 +756,7 @@ class SearchPattern:
 
     def make_string(self, pattern_output_format = None, determined = None, indent = 0, verbosity = 0):
         if pattern_output_format == None:
-            pattern_output_format = "rle"
+            pattern_output_format = LLS_defaults.pattern_output_format
 
         print_message('Formatting output...', 3, indent = indent, verbosity = verbosity)
 
