@@ -37,22 +37,16 @@ def implies(antecedents, consequent):
         antecedents = [antecedents]
     return map(negate, list(antecedents)) + [consequent]
 
-def neighbours_from_coordinates(grid,x,y,t,t_offset=-1):
+def neighbours_from_coordinates(grid,x,y,t,t_offset=-1,outside_border="0"):
 
     width = len(grid[0][0])
     height = len(grid[0])
 
     neighbours = []
     for x_offset, y_offset in [(1,0),(1,1),(0,1),(-1,1),(-1,0),(-1,-1),(0,-1),(1,-1)]:
-        if (x+ x_offset in range(width) and y + y_offset in range(height)):
+        if (x + x_offset in range(width) and y + y_offset in range(height)):
             neighbours.append(grid[t + t_offset][y + y_offset][x + x_offset])
         else:
-            neighbours.append("0")
+            neighbours.append(outside_border)
 
     return neighbours
-
-def neighbour_indices_from_coordinates(width,height,x,y,t,t_offset=-1):
-    return [(x + x_offset, y + y_offset, t + t_offset)
-        for (x_offset, y_offset)
-        in [(1,0),(1,1),(0,1),(-1,1),(-1,0),(-1,-1),(0,-1),(1,-1)]
-        if (x+ x_offset in range(width) and y + y_offset in range(height))]

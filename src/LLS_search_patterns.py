@@ -3,7 +3,7 @@ import LLS_files
 import LLS_formatting
 from SearchPattern import SearchPattern
 from LLS_messages import print_message
-from LLS_literal_manipulation import neighbour_indices_from_coordinates, variable_from_literal, negate
+from LLS_literal_manipulation import neighbours_from_coordinates, variable_from_literal, negate
 
 
 def search_pattern_from_string(input_string, indent = 0, verbosity = 0):
@@ -153,12 +153,11 @@ def check_orphan(file_name, number_of_generations, indent = 0, verbosity = 0):
     for t in range(number_of_generations - 1, -1, -1):
         for y in range(height):
             for x in range(width):
-                neighbours = [grid[neighbour_t][neighbour_y][neighbour_x]
-                              for neighbour_x, neighbour_y, neighbour_t
-                              in neighbour_indices_from_coordinates(width,height,x,y,t,t_offset=1)]
                 if t == number_of_generations - 1:
+                    neighbours = neighbours_from_coordinates(grid,x,y,t,t_offset=1,outside_border="*")
                     nonempties = ["0", "1"]
                 else:
+                    neighbours = neighbours_from_coordinates(grid,x,y,t,t_offset=1,outside_border="0")
                     nonempties = ["*"]
                 if any(nonempty in neighbours for nonempty in nonempties):
                     grid[t][y][x] = "*"

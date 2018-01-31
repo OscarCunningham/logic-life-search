@@ -2,7 +2,7 @@ import collections, copy, itertools
 import LLS_taocp_variable_scheme, LLS_formatting, LLS_rules
 from UnsatInPreprocessing import UnsatInPreprocessing
 from LLS_messages import print_message
-from LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, neighbour_indices_from_coordinates, implies
+from LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, implies
 
 class SearchPattern:
     def __init__(self, grid, ignore_transition = None, clauses = None, rule = None, indent = 0, verbosity = 0):
@@ -842,7 +842,7 @@ class SearchPattern:
                             if t == 0:
                                 determined[t][y][x] = True
                                 determined_variables.add(variable)
-                            elif determined[t-1][y][x] and all(determined[t_neighbour][y_neighbour][x_neighbour] for x_neighbour, y_neighbour, t_neighbour in neighbour_indices_from_coordinates(width,height,x,y,t)) and not self.ignore_transition[t][y][x]:
+                            elif all(determined[t -1][y + y_offset][x + x_offset] for x_offset in range(2) for y_offset in range(2) if x + x_offset in range(width) and y + y_offset in range(height)) and not self.ignore_transition[t][y][x]:
                                 determined[t][y][x] = True
                                 determined_variables.add(variable)
                             elif variable in determined_variables:
