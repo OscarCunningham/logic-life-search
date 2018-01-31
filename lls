@@ -277,7 +277,12 @@ if args.agar_crawler_search_pattern:
     args.period = None
 
 if args.check_orphan:
-    file_name = args.check_orphan[0]
+    if os.path.isfile(args.check_orphan[0]):
+        file_name = args.check_orphan[0]
+    elif os.path.isfile("search_patterns/" + args.check_orphan[0]):
+        file_name = "search_patterns/" + args.check_orphan[0]
+    else:
+        assert False, "Search pattern file not found"
     if len(args.check_orphan) == 2:
         number_of_generations = int(args.check_orphan[1])
     else:
