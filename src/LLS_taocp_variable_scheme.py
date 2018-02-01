@@ -165,7 +165,7 @@ def transition_rule(grid, x, y, t):
         negate(predecessor_cell),
         negate(literal_name(grid, x, y, t - 1, "a", at_least = 3))],
         negate(cell)))
-    # If the predecessor is dead and there are at least 3 neighbours then the cell lives TODO: This doesn't seem true
+    # If there are exactly 3 neighbours then the cell lives
     clauses.append(implies([
         negate(literal_name(grid, x, y, t - 1, "a", at_least = 4)),
         literal_name(grid, x, y, t - 1, "a", at_least = 3)],

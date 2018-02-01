@@ -145,7 +145,7 @@ def use_solver(solver, file_name, parameters = None, timeout = None, indent = 0,
         print_message('Done\n', 3, indent = indent, verbosity = verbosity)
 
     else:
-        print_message('Timed out\n', 3, indent = indent, verbosity = verbosity) #TODO: How to capture output from SAT solver after killing it?
+        print_message('Timed out\n', 3, indent = indent, verbosity = verbosity)
         solution = "TIMEOUT\n"
 
     return solution, time_taken

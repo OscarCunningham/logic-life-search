@@ -323,8 +323,6 @@ class SearchPattern:
                                 predecessor_cell = self.grid[t - 1][y][x]
                                 neighbours = neighbours_from_coordinates(self.grid, x, y, t)
 
-                                #TODO: Do the following clauses work if there aren't eight neighbours?
-
                                 # If any four neighbours were live, then the cell is
                                 # dead
                                 for four_neighbours in itertools.combinations(neighbours, 4):
