@@ -135,7 +135,7 @@ def use_solver(solver, file_name, parameters = None, timeout = None, indent = 0,
         if solver == "riss":
             solution = re.sub("s ", "", solution)
             solution = re.sub("v ", "", solution)
-        if solution == "UNSATISFIABLE\n":
+        if "UNSAT" in solution.upper():
             solution = "UNSAT\n"
 
         print_message("SAT solver output:", 3, indent = indent + 1, verbosity = verbosity)
