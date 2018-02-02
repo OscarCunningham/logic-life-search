@@ -2,6 +2,7 @@ import LLS_files
 import LLS_formatting
 import LLS_DIMACS
 import LLS_SAT_solvers
+import LLS_defaults
 from SearchPattern import SearchPattern
 from UnsatInPreprocessing import UnsatInPreprocessing
 from LLS_messages import print_message
