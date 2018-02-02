@@ -10,12 +10,15 @@ def parse_input_string(input_string, indent = 0, verbosity = 0):
     print_message("Parsing input pattern...", 3, indent = indent, verbosity = verbosity)
 
     # Remove any trailing (or leading) whitespace and commas
-    input_string = input_string.strip(", \t\n\r\f\v")
+    input_string = input_string.strip(", \t\n\f\v")
+
+    # Remove pesky carriage returns
+    input_string = re.sub("\r","",input_string)
 
     # Break down string into list-of-lists-of-lists
-    split_by_generation = re.split("[ ,\t]*(?:\n|\r|(?:\r\n))(?:[ ,\t]*(?:\n|\r|(?:\r\n)))+[ ,\t]*", # Split on at least two newlines (or carriage returns) and any commas or spaces
+    split_by_generation = re.split("[ ,\t]*(?:\n)(?:[ ,\t]*(?:\n))+[ ,\t]*", # Split on at least two newlines and any commas or spaces
                                    input_string)
-    split_by_line = [re.split("[ ,\t]*(?:\n|\r|(?:\r\n))[ ,\t]*", # Split on signle newline (or carriage return) and any ammount of commas or spaces
+    split_by_line = [re.split("[ ,\t]*(?:\n)[ ,\t]*", # Split on signle newline and any ammount of commas or spaces
                      generation)
                      for generation in split_by_generation]
     grid = [[re.split("[ ,\t]*",  # Split on any amount of commas or spaces
