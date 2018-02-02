@@ -333,6 +333,18 @@ def preprocess(
         print_message('Done\n', 3, indent = indent+1, verbosity = verbosity)
     if optimise:
         search_pattern.optimise(indent = indent + 1, verbosity = verbosity)
+    else:
+        print_message(
+            'Preparing search grid ...',
+            3,
+            indent = indent+1, verbosity = verbosity
+        )
+        search_pattern.improve_grid(gentle = True, verbosity = 0)
+        print_message(
+            'Done\n',
+            3,
+            indent = indent+1, verbosity = verbosity
+        )
     if force_evolution:
         # The most important bit. Enforces the evolution rules
         search_pattern.force_evolution(method=method, indent = indent + 1, verbosity = verbosity)
