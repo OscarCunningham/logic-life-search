@@ -21,7 +21,7 @@ class SearchPattern:
                                   else [])
         self.rule = (copy.deepcopy(rule)
                                   if (rule != None)
-                                  else LLS_rules.rule_from_rulestring(LLS_defaults.rule))
+                                  else LLS_rules.rule_from_rulestring(LLS_defaults.rulestring))
         assert len(self.grid) == len(self.ignore_transition), "Durations of grid and ignore_transition don't match"
         assert len(self.grid[0]) == len(self.ignore_transition[0]), "Heights of grid and ignore_transition don't match"
         assert len(self.grid[0][0]) == len(self.ignore_transition[0][0]), "Widths of grid and ignore_transition don't match"
