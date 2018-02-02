@@ -326,12 +326,12 @@ def preprocess(
         search_pattern.force_at_most(literals, amount, indent = indent+1, verbosity = verbosity)
         print_message('Done\n', 3, indent = indent+1, verbosity = verbosity)
 
-    search_pattern.optimise(indent = indent + 1, verbosity = verbosity)
+    #search_pattern.optimise(indent = indent + 1, verbosity = verbosity)
     if force_evolution:
         # The most important bit. Enforces the evolution rules
         search_pattern.force_evolution(method=method, indent = indent + 1, verbosity = verbosity)
         # Optimise again, this time we know the grid hasn't changed
-        search_pattern.optimise(grid_changed = False, clauses_changed = True, indent = indent + 1, verbosity = verbosity)
+        #search_pattern.optimise(grid_changed = False, clauses_changed = True, indent = indent + 1, verbosity = verbosity)
     print_message(
         "Search pattern optimised to:\n" + search_pattern.make_string(pattern_output_format = "csv") + "\n",
         3,

@@ -1,6 +1,8 @@
 import copy
 import LLS_files
 import LLS_formatting
+import LLS_rules
+import LLS_defaults
 from SearchPattern import SearchPattern
 from LLS_messages import print_message
 from LLS_literal_manipulation import neighbours_from_coordinates, variable_from_literal, negate
@@ -562,3 +564,33 @@ def hwss_eater_search_pattern(width,height,digestion_time,symmetry="C1",indent =
     print_message("Pattern created:\n" + search_pattern.make_string(pattern_output_format = "csv") + "\n", 3, indent = indent+1, verbosity = verbosity)
     print_message('Done\n', 3, indent = indent, verbosity = verbosity)
     return search_pattern.grid, search_pattern.ignore_transition
+
+def stator_search_pattern(pattern, rule=None, indent=0, verbosity=0):
+    if rule == None:
+        rule = LLS_rules.rule_from_rulestring(LLS_defaults.rulestring)
+    width = len(pattern[0])
+    height = len(pattern)
+    grid = [pattern]
+    duration = 1
+    print_message('Creating oscillator...', 3, indent = indent, verbosity = verbosity)
+    while True:
+        print_message('Generation: ' + str(duration), 3, indent = indent + 1, verbosity = verbosity)
+        grid.append([["0" for x in xrange(width)] for y in xrange(height)])
+        duration += 1
+        for x in xrange(width):
+            for y in xrange(height):
+                BS_letter = "S" if grid[-2][y][x] == "1" else "B"
+                grid[-1][y][x] = rule[BS_letter + LLS_rules.transition_from_cells(neighbours_from_coordinates(grid,x,y,-1))]
+        if grid[0] == grid[-1]:
+            break
+    number_of_variables = 0
+    for x in xrange(width):
+        for y in xrange(height):
+            if all(grid[t][y][x] == grid[0][y][x] for t in xrange(duration)):
+                for t in xrange(duration):
+                    grid[t][y][x] = "stator_cell_" + str(number_of_variables)
+                number_of_variables += 1
+    grid = [[["0" for x in range(width)]] + generation + [["0" for x in range(width)]] for generation in grid]
+    grid = [[["0"] + row + ["0"] for row in generation] for generation in grid]
+    print_message('Done\n', 3, indent = indent, verbosity = verbosity)
+    return grid

@@ -36,6 +36,12 @@ parser.add_argument(
     help = '''Creates a search pattern to check if the pattern in the given file is an orphan. Extra numerical argument to check several generations back. The file format is "1" for alive, "0" for dead, "*" for don't-care'''
 )
 parser.add_argument(
+    '--stator',
+    nargs = "+",
+    default = None,
+    help = '''Creates a search pattern for the stator of the oscillator in the given file'''
+)
+parser.add_argument(
     '-a', '--agar_crawler_search_pattern',
     nargs = "+",
     type = int,
@@ -195,7 +201,8 @@ number_of_search_patterns = sum(map(bool, [
     args.input_file_name,
     args.blank_search_pattern,
     args.agar_crawler_search_pattern,
-    args.check_orphan
+    args.check_orphan,
+    args.stator
 ]))
 assert number_of_search_patterns < 2, "Too many search patterns specified"
 
@@ -289,6 +296,21 @@ if args.check_orphan:
     else:
         number_of_generations = 1
     grid, ignore_transition = src.LLS_search_patterns.check_orphan(file_name, number_of_generations, indent = indent + 1, verbosity = verbosity)
+
+if args.stator:
+    if os.path.isfile(args.stator[0]):
+        file_name = args.stator[0]
+    elif os.path.isfile("search_patterns/" + args.stator[0]):
+        file_name = "search_patterns/" + args.stator[0]
+    else:
+        assert False, "Search pattern file not found"
+    grid, _ = src.LLS_formatting.parse_input_string(
+        src.LLS_files.string_from_file(
+            file_name,
+            indent = indent + 1, verbosity = verbosity
+        ),
+    indent = indent + 1, verbosity = verbosity)
+    grid = src.LLS_search_patterns.stator_search_pattern(grid[0], rule, indent = indent + 1, verbosity = verbosity)
 
 if number_of_search_patterns == 0:
     print_message(
