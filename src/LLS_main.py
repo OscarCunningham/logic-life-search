@@ -26,7 +26,7 @@ def LLS(
     force_nonempty=False,
     force_evolution=True,
     dry_run=False,
-    optimise = True,
+    optimise = None,
     number_of_solutions=None,
     pattern_output_format=None,
     output_file_name=None,
@@ -157,7 +157,7 @@ def preprocess_and_solve(search_pattern,
     force_nonempty=False,
     force_evolution=True,
     dry_run=False,
-    optimise=True,
+    optimise=None,
     indent=0, verbosity=0
 ):
     """Preprocess and solve the search pattern"""
@@ -279,7 +279,7 @@ def preprocess(
     force_change=[],
     force_nonempty=False,
     force_evolution=True,
-    optimise=True,
+    optimise=LLS_defaults.optimise,
     indent=0, verbosity=0
 ):
     """Apply constraints and create SAT problem"""

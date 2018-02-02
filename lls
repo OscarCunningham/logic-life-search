@@ -179,6 +179,11 @@ parser.add_argument(
     help = "Don't do any optimisation."
 )
 parser.add_argument(
+    "--optimise",
+    action = "store_true",
+    help = "Don't do any optimisation."
+)
+parser.add_argument(
     '--parameters',
     type = str,
     default = None,
@@ -356,7 +361,7 @@ src.LLS_main.LLS(
     force_nonempty = args.force_nonempty,
     force_evolution = True,
     dry_run = args.dry_run,
-    optimise = not args.no_optimise,
+    optimise = None if not (args.optimise ^ args.no_optimise) else args.optimise,
     number_of_solutions = args.number_of_solutions,
     pattern_output_format = args.csv,
     output_file_name = args.output_file_name,
