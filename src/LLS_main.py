@@ -67,11 +67,11 @@ def LLS(
     )
 
     # Check if the first generation of pattern determines the others
-    determined = search_pattern.deterministic(indent = indent, verbosity = verbosity)
 
     solutions = []
 
     if sat == "SAT":
+        determined = search_pattern.deterministic(indent = indent, verbosity = verbosity)
         solutions.append(solution)
         output_string = solution.make_string(
             pattern_output_format = pattern_output_format,
