@@ -218,7 +218,7 @@ if args.substitute_solution:
         grid,
         ignore_transition,
         rule,
-        DIMACS_variables_from_CNF_list_variables
+        DIMACS_literal_from_variable
     ) = src.LLS_files.object_from_file(
         args.substitute_solution[0],
         indent = indent, verbosity = verbosity
@@ -231,9 +231,9 @@ if args.substitute_solution:
         rule = rule,
         indent = indent, verbosity = verbosity
     )
+    search_pattern.clauses.DIMACS_literal_from_variable = DIMACS_literal_from_variable
     solution = search_pattern.substitute_solution(
         solution,
-        DIMACS_variables_from_CNF_list_variables,
         indent = indent, verbosity = verbosity
     )
     output_string = solution.make_string(

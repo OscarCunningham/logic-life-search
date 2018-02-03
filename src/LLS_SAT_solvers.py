@@ -10,8 +10,11 @@ import LLS_defaults
 from LLS_messages import print_message
 
 
-def SAT_solve(DIMACS_string, solver=None, parameters=None, timeout=None, save_dimacs = None, dry_run = None, indent = 0, verbosity = 0):
+def SAT_solve(search_pattern, solver=None, parameters=None, timeout=None, save_dimacs = None, dry_run = None, indent = 0, verbosity = 0):
     """Solve the given DIMACS problem, using the specified SAT solver"""
+
+    print_message('Solving...', indent = indent, verbosity = verbosity)
+    indent += 1
     print_message('Preparing SAT solver input...', 3, indent = indent, verbosity = verbosity)
     solvers = [
         "minisat",
@@ -43,7 +46,7 @@ def SAT_solve(DIMACS_string, solver=None, parameters=None, timeout=None, save_di
             dimacs_file = "lls_dimacs" + str(file_number) + ".cnf"
 
     # The solvers prefer their input as a file, so write it out
-    LLS_files.file_from_string(dimacs_file, DIMACS_string, indent = indent + 1, verbosity = verbosity)
+    search_pattern.clauses.make_file(dimacs_file, indent = indent + 1, verbosity = verbosity)
 
     print_message('Done\n', 3, indent = indent, verbosity = verbosity)
     if not dry_run:
@@ -62,8 +65,18 @@ def SAT_solve(DIMACS_string, solver=None, parameters=None, timeout=None, save_di
             else:
                 raise
         print_message('Done\n', 3, indent = indent, verbosity = verbosity)
-
-    return solution, time_taken
+    indent -= 1
+    if solution not in ["UNSAT\n", "TIMEOUT\n", "DRYRUN\n"]:
+        sat = "SAT"
+        solution = search_pattern.substitute_solution(
+            solution,
+            indent = indent + 1, verbosity = verbosity
+        )
+    else:
+        sat = solution[:-1]
+        solution = None
+    print_message('Done\n', indent = indent, verbosity = verbosity)
+    return solution, sat, time_taken
 
 def use_solver(solver, file_name, parameters = None, timeout = None, indent = 0, verbosity = 0):
 

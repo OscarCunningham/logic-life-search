@@ -1,7 +1,6 @@
 import os
 import LLS_files
 import LLS_formatting
-import LLS_DIMACS
 import LLS_SAT_solvers
 import LLS_defaults
 from UnsatInPreprocessing import UnsatInPreprocessing
@@ -162,13 +161,7 @@ def preprocess_and_solve(search_pattern,
 ):
     """Preprocess and solve the search pattern"""
     try:
-        (
-            DIMACS_string,
-            DIMACS_variables_from_CNF_list_variables,
-            number_of_variables,
-            number_of_clauses,
-            number_of_cells
-        ) = preprocess(
+        preprocess(
             search_pattern,
             symmetry = symmetry,
             period = period,
@@ -195,7 +188,7 @@ def preprocess_and_solve(search_pattern,
             print_message("Saving state...", 3, indent = indent + 1, verbosity = verbosity)
             LLS_files.file_from_object(
                 state_file,
-                (search_pattern.grid, search_pattern.ignore_transition, search_pattern.rule, DIMACS_variables_from_CNF_list_variables),
+                (search_pattern.grid, search_pattern.ignore_transition, search_pattern.rule, search_pattern.clauses.DIMACS_literal_from_variable),
                 indent = indent + 2, verbosity = verbosity
             )
             print_message("Done\n", 3, indent = indent + 1, verbosity = verbosity)
@@ -227,6 +220,9 @@ def preprocess_and_solve(search_pattern,
             for y in range(height))
             for z in range(duration)
         )
+        number_of_cells = search_pattern.number_of_cells()
+        number_of_variables = search_pattern.clauses.number_of_variables
+        number_of_clauses = search_pattern.clauses.number_of_clauses
         print_message('Number of undetermined cells: ' + str(number_of_cells), indent = indent, verbosity = verbosity)
         print_message('Number of variables: ' + str(number_of_variables), indent = indent, verbosity = verbosity)
         print_message('Number of clauses: ' + str(number_of_clauses) + "\n", indent = indent, verbosity = verbosity)
@@ -262,10 +258,8 @@ def preprocess_and_solve(search_pattern,
             solution,
             sat,
             time_taken
-        ) = solve(
+        ) = LLS_SAT_solvers.SAT_solve(
             search_pattern,
-            DIMACS_string,
-            DIMACS_variables_from_CNF_list_variables,
             solver = solver,
             parameters = parameters,
             timeout = timeout,
@@ -360,54 +354,4 @@ def preprocess(
     if force_evolution:
         # The most important bit. Enforces the evolution rules
         search_pattern.force_evolution(method=method, indent = indent + 1, verbosity = verbosity)
-    (
-        DIMACS_string,
-        DIMACS_variables_from_CNF_list_variables,
-        number_of_variables,
-        number_of_clauses
-    ) = LLS_DIMACS.DIMACS_from_CNF_list(
-        search_pattern.clauses,
-        indent = indent + 1, verbosity = verbosity
-    )
-    number_of_cells = search_pattern.number_of_cells()
     print_message('Done\n', indent = indent, verbosity = verbosity)
-    return DIMACS_string, DIMACS_variables_from_CNF_list_variables, number_of_variables, number_of_clauses, number_of_cells
-
-
-def solve(
-    search_pattern,
-    DIMACS_string,
-    DIMACS_variables_from_CNF_list_variables,
-    solver=None,
-    parameters=None,
-    timeout=None,
-    save_dimacs=None,
-    dry_run=None,
-    indent=0, verbosity=0
-):
-    """Solves the problem and substitutes the result back in"""
-    print_message('Solving...', indent = indent, verbosity = verbosity)
-    (
-        DIMACS_solution,
-        time_taken
-    ) = LLS_SAT_solvers.SAT_solve(
-        DIMACS_string,
-        solver = solver,
-        parameters = parameters,
-        timeout = timeout,
-        save_dimacs = save_dimacs,
-        dry_run = dry_run,
-        indent = indent + 1, verbosity = verbosity
-    )
-    if DIMACS_solution not in ["UNSAT\n", "TIMEOUT\n", "DRYRUN\n"]:
-        sat = "SAT"
-        solution = search_pattern.substitute_solution(
-            DIMACS_solution,
-            DIMACS_variables_from_CNF_list_variables,
-            indent = indent + 1, verbosity = verbosity
-        )
-    else:
-        sat = DIMACS_solution[:-1]
-        solution = None
-    print_message('Done\n', indent = indent, verbosity = verbosity)
-    return solution, sat, time_taken

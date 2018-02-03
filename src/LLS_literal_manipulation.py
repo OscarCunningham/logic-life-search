@@ -16,11 +16,8 @@ def negate(literal, flag = True, DIMACS = False):
     return negation
 
 
-def variable_from_literal(literal, DIMACS = False):
+def variable_from_literal(literal):
     """Breaks down a literal into a variable and a flag for negation"""
-
-    if not DIMACS:
-        assert literal not in ["0","1"], 'Trying to find the underlying variable of "0" or "1"'
 
     if literal[0] == "-":
         variable = literal[1:]

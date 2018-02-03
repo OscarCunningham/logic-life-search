@@ -5,26 +5,28 @@ import LLS_taocp_variable_scheme
 import LLS_formatting
 import LLS_rules
 import LLS_defaults
+from ClauseList import ClauseList
 from UnsatInPreprocessing import UnsatInPreprocessing
 from LLS_messages import print_message
 from LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, implies
 
 class SearchPattern:
-    def __init__(self, grid, ignore_transition = None, clauses = None, rule = None, indent = 0, verbosity = 0):
+
+
+    def __init__(self, grid, ignore_transition = None, rule = None, indent = 0, verbosity = 0):
         self.grid = copy.deepcopy(grid)
         self.ignore_transition = (copy.deepcopy(ignore_transition)
                                   if (ignore_transition != None)
                                   else [[[False
                                   for cell in row] for row in generation] for generation in grid])
-        self.clauses = (copy.deepcopy(clauses)
-                                  if (clauses != None)
-                                  else [])
+        self.clauses = ClauseList()
         self.rule = (copy.deepcopy(rule)
                                   if (rule != None)
                                   else LLS_rules.rule_from_rulestring(LLS_defaults.rulestring))
         assert len(self.grid) == len(self.ignore_transition), "Durations of grid and ignore_transition don't match"
         assert len(self.grid[0]) == len(self.ignore_transition[0]), "Heights of grid and ignore_transition don't match"
         assert len(self.grid[0][0]) == len(self.ignore_transition[0][0]), "Widths of grid and ignore_transition don't match"
+
 
     def __eq__(self, other):
         if other == None:
@@ -35,6 +37,7 @@ class SearchPattern:
 
     def __ne__(self, other):
         return not __eq__(self, other)
+
 
     def standardise_varaibles_names(self, indent = 0, verbosity = 0):
         print_message("Standardising variable names...", 3, indent = indent, verbosity = verbosity)
@@ -55,15 +58,6 @@ class SearchPattern:
                             standard_variables_from_input_variables[variable] = negate("c" + str(current_variable_number),negated)
                             current_variable_number += 1
                         self.grid[t][y][x] = negate(standard_variables_from_input_variables[variable],negated)
-        # Rename any literals in clauses
-        for clause_number, clause in enumerate(self.clauses):
-            for literal_number, literal in enumerate(clause):
-                if literal not in ["0", "1"]:
-                    (variable, negated) = variable_from_literal(literal)
-                    if not standard_variables_from_input_variables.has_key(variable):
-                        standard_variables_from_input_variables[variable] = negate("c" + str(current_variable_number),negated)
-                        current_variable_number += 1
-                    self.clauses[clause_number][literal_number] = negate(standard_variables_from_input_variables[variable],negated)
         # Rename any literals in rule
         for transition, literal in self.rule.items():
             if literal not in ["0", "1"]:
@@ -212,8 +206,7 @@ class SearchPattern:
         assert method == 2 or LLS_rules.rulestring_from_rule(self.rule) == "B3/S23", "Rules other than Life can only use method 2"
 
         print_message("Method: " + str(method), 3, indent = indent + 1, verbosity = verbosity)
-
-        clauses = []
+        starting_number_of_clauses = self.clauses.number_of_clauses
         # Iterate over all cells not in the first generation
         for t, generation in enumerate(self.grid):
             if t > 0:
@@ -222,7 +215,7 @@ class SearchPattern:
                         if not self.ignore_transition[t][y][x]:
 
                             if method == 0:
-                                clauses += LLS_taocp_variable_scheme.transition_rule(self.grid, x, y, t)
+                                self.clauses.extend(LLS_taocp_variable_scheme.transition_rule(self.grid, x, y, t))
 
                             elif method == 1:
                                 predecessor_cell = self.grid[t - 1][y][x]
@@ -232,18 +225,18 @@ class SearchPattern:
                                 # dead
                                 for four_neighbours in itertools.combinations(neighbours, 4):
                                     clause = implies(four_neighbours, negate(cell))
-                                    clauses.append(clause)
+                                    self.clauses.append(clause)
 
                                 # If any seven neighbours were dead, the cell is dead
                                 for seven_neighbours in itertools.combinations(neighbours, 7):
                                     clause = implies(map(negate,seven_neighbours), negate(cell))
-                                    clauses.append(clause)
+                                    self.clauses.append(clause)
 
                                 # If the cell was dead, and any six neighbours were
                                 # dead, the cell is dead
                                 for six_neighbours in itertools.combinations(neighbours, 6):
                                     clause = implies([negate(predecessor_cell)] + map(negate,six_neighbours), negate(cell))
-                                    clauses.append(clause)
+                                    self.clauses.append(clause)
 
                                 # If three neighbours were alive and five were dead,
                                 # then the cell is live
@@ -253,7 +246,7 @@ class SearchPattern:
                                     three_neighbours, five_neighbours = list(three_neighbours), list(neighbours_counter.elements())
 
                                     clause = implies(three_neighbours + map(negate, five_neighbours), cell)
-                                    clauses.append(clause)
+                                    self.clauses.append(clause)
 
                                 # Finally, if the cell was live, and two neighbours
                                 # were live, and five neighbours were dead, then the
@@ -264,7 +257,7 @@ class SearchPattern:
                                     two_neighbours, five_neighbours = list(two_neighbours), list(neighbours_counter.elements())[1:]
 
                                     clause = implies([predecessor_cell] + two_neighbours + map(negate, five_neighbours), cell)
-                                    clauses.append(clause)
+                                    self.clauses.append(clause)
 
                             elif method == 2:
 
@@ -281,20 +274,22 @@ class SearchPattern:
                                         transition = LLS_rules.transition_from_cells(neighbours_alive)
                                         transition_literal = self.rule[BS_letter + transition]
 
-                                        clauses.append(implies([transition_literal] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), cell))
-                                        clauses.append(implies([negate(transition_literal)] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), negate(cell)))
+                                        self.clauses.append(implies([transition_literal] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), cell))
+                                        self.clauses.append(implies([negate(transition_literal)] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), negate(cell)))
 
-        print_message("Number of clauses used: " + str(len(clauses)), 3, indent = indent + 1, verbosity = verbosity)
+        print_message(
+            "Number of clauses used: " + str(self.clauses.number_of_clauses - starting_number_of_clauses),
+            3,
+            indent = indent + 1, verbosity = verbosity
+        )
         print_message("Done\n", 3, indent = indent, verbosity = verbosity)
-
-        self.clauses += clauses
 
     def force_nonempty(self, indent = 0, verbosity = 0):
         """Adds clauses forcing at least one cell to be live in first generation"""
 
         print_message("Forcing at least one cell to be live in first generation...", 3, indent = indent, verbosity = verbosity)
 
-        self.clauses += [[cell for row in self.grid[0] for cell in row]]
+        self.clauses.append([cell for row in self.grid[0] for cell in row])
         print_message("Number of clauses used: 1", 3, indent = indent + 1, verbosity = verbosity)
         print_message("Done\n", 3, indent = indent, verbosity = verbosity)
 
@@ -312,11 +307,12 @@ class SearchPattern:
 
         print_message("Forcing at least one cell to change between generations " + str(t_0) + " and " + str(t_1) + " ...", 3, indent = indent, verbosity = verbosity)
 
+        starting_number_of_clauses = self.clauses.number_of_clauses
+
         generation_0 = self.grid[t_0]
         generation_1 = self.grid[t_1]
 
         clause = []
-        clauses = []
 
         for y, rows in enumerate(zip(generation_0,generation_1)):
             for x, cells in enumerate(zip(*rows)):
@@ -326,13 +322,16 @@ class SearchPattern:
                                "t" + str(t_0) +
                                "and" +
                                "t" + str(t_1))
-                clauses.append(implies(cells, cells_equal))
-                clauses.append(implies(map(negate, cells), cells_equal))
+                self.clauses.append(implies(cells, cells_equal))
+                self.clauses.append(implies(map(negate, cells), cells_equal))
                 clause.append(negate(cells_equal))
 
-        clauses.append(clause)
-        print_message("Number of clauses used: " + str(len(clauses)), 3, indent = indent + 1, verbosity = verbosity)
-        self.clauses += clauses
+        self.clauses.append(clause)
+        print_message(
+            "Number of clauses used: " + str(self.clauses.number_of_clauses - starting_number_of_clauses),
+            3,
+            indent = indent + 1, verbosity = verbosity
+        )
         print_message("Done\n", 3, indent = indent, verbosity = verbosity)
 
 
@@ -363,6 +362,7 @@ class SearchPattern:
             else:
                 clause.append(negate(literal))
         self.clauses.append(clause)
+        print_message("Number of clauses used: 1", 3, indent = indent + 1, verbosity = verbosity)
         print_message("Done\n", 3, indent = indent, verbosity = verbosity)
 
     def define_cardinality_variable(self, literals, at_least, already_defined = None, preprocessing = True):
@@ -389,8 +389,6 @@ class SearchPattern:
             return "at_least_" + str(at_least) + "_of_" + str(literals)
 
         name = cardinality_variable_name(literals_copy, at_least)
-        clauses = []
-        number_of_clauses = 0
 
         if name not in already_defined:
             already_defined.append(name)
@@ -405,18 +403,18 @@ class SearchPattern:
 
             # If at_least is obviously too small or too big, give the obvious answer
             if at_least <= 0:
-                clauses.append([name])
+                self.clauses.append([name])
             elif at_least > max_literals:
-                clauses.append([negate(name)])
+                self.clauses.append([negate(name)])
             elif max_literals == 1:
                 literal = literals_copy[0]
-                clauses.append([negate(name), literal])
-                clauses.append([name, negate(literal)])
+                self.clauses.append([negate(name), literal])
+                self.clauses.append([name, negate(literal)])
 
             # Otherwise define the appropriate clauses
             else:
                 if at_least <= max_literals_1:
-                    clauses.append(
+                    self.clauses.append(
                         implies(
                             cardinality_variable_name(literals_1, at_least),
                             name))
@@ -424,7 +422,7 @@ class SearchPattern:
                 for j in range(1, max_literals_2 + 1):
                     for i in range(1, max_literals_1 + 1):
                         if i + j == at_least:
-                            clauses.append(
+                            self.clauses.append(
                                 implies(
                                     [cardinality_variable_name(literals_1, i),
                                     cardinality_variable_name(literals_2, j)],
@@ -432,7 +430,7 @@ class SearchPattern:
                             variables_to_define_1.append(i)
                             variables_to_define_2.append(j)
                 if at_least <= max_literals_2:
-                    clauses.append(
+                    self.clauses.append(
                         implies(
                             cardinality_variable_name(literals_2, at_least),
                             name))
@@ -440,7 +438,7 @@ class SearchPattern:
 
                 if at_least > max_literals_2:
                     i = at_least - max_literals_2
-                    clauses.append(
+                    self.clauses.append(
                         implies(
                             negate(cardinality_variable_name(literals_1, i)),
                             negate(name)))
@@ -448,7 +446,7 @@ class SearchPattern:
                 for j in range(1, max_literals_2 + 1):
                     for i in range(1, max_literals_1 + 1):
                         if i + j == at_least + 1:
-                            clauses.append(implies([
+                            self.clauses.append(implies([
                                     negate(cardinality_variable_name(literals_1, i)),
                                     negate(cardinality_variable_name(literals_2, j))],
                                     negate(name)))
@@ -456,7 +454,7 @@ class SearchPattern:
                             variables_to_define_2.append(j)
                 if at_least > max_literals_1:
                     j = at_least - max_literals_1
-                    clauses.append(
+                    self.clauses.append(
                         implies(
                             negate(cardinality_variable_name(literals_2, j)),
                             negate(name)))
@@ -468,21 +466,22 @@ class SearchPattern:
 
             # Define the child variables
             for at_least_1 in variables_to_define_1:
-                _, number_of_extra_clauses = self.define_cardinality_variable(literals_1, at_least_1, already_defined, preprocessing = False)
-                number_of_clauses += number_of_extra_clauses
+                self.define_cardinality_variable(literals_1, at_least_1, already_defined, preprocessing = False)
             for at_least_2 in variables_to_define_2:
-                _, number_of_extra_clauses = self.define_cardinality_variable(literals_2, at_least_2, already_defined, preprocessing = False)
-                number_of_clauses += number_of_extra_clauses
-        number_of_clauses += len(clauses)
-        self.clauses += clauses
-        return name, number_of_clauses
+                self.define_cardinality_variable(literals_2, at_least_2, already_defined, preprocessing = False)
+        return name
 
     def force_at_least(self, literals, at_least, indent = 0, verbosity = 0):
         """Adds clauses forcing at least at_least of literals to be true"""
 
-        name, number_of_clauses = self.define_cardinality_variable(literals, at_least)
+        starting_number_of_clauses = self.clauses.number_of_clauses
+        name = self.define_cardinality_variable(literals, at_least)
         self.clauses.append([name])
-        print_message("Number of clauses used: " + str(number_of_clauses + 1), 3, indent = indent + 1, verbosity = verbosity)
+        print_message(
+            "Number of clauses used: " + str(self.clauses.number_of_clauses - starting_number_of_clauses),
+            3,
+            indent = indent + 1, verbosity = verbosity
+        )
 
     def force_at_most(self, literals, at_most, indent = 0, verbosity = 0):
         """Adds clauses forcing at least at_least of literals to be true"""
@@ -592,14 +591,6 @@ class SearchPattern:
                             if replacement[variable] != variable:
                                 self.grid[t][y][x] = negate(replacement[variable], negated)
 
-        for clause_number, clause in enumerate(self.clauses):
-            for literal_number, literal in enumerate(clause):
-                if literal not in ["0", "1"]:
-                    variable, negated = variable_from_literal(literal)
-                    if replacement.has_key(variable):
-                        if replacement[variable] != variable:
-                            self.clauses[clause_number][literal_number] = negate(replacement[variable], negated)
-
         for transition, literal in self.rule.items():
             if literal not in ["0", "1"]:
                 variable, negated = variable_from_literal(literal)
@@ -671,7 +662,7 @@ class SearchPattern:
 
 
 
-    def substitute_solution(self, solution, DIMACS_variables_from_CNF_list_variables, indent = 0, verbosity = 0):
+    def substitute_solution(self, solution, indent = 0, verbosity = 0):
         """Return a copy of the search_pattern with the solution substituted back into it"""
         grid = copy.deepcopy(self.grid)
         rule = copy.deepcopy(self.rule)
@@ -688,8 +679,8 @@ class SearchPattern:
                         pass
                     else:
                         (CNF_variable, negated) = variable_from_literal(cell)
-                        if DIMACS_variables_from_CNF_list_variables.has_key(CNF_variable):
-                            DIMACS_variable = DIMACS_variables_from_CNF_list_variables[CNF_variable]
+                        if self.clauses.DIMACS_literal_from_variable.has_key(CNF_variable):
+                            DIMACS_variable = self.clauses.DIMACS_literal_from_variable[CNF_variable]
 
                             DIMACS_literal = negate(DIMACS_variable, negated)
 
@@ -705,8 +696,8 @@ class SearchPattern:
                 pass
             else:
                 (CNF_variable, negated) = variable_from_literal(literal)
-                if DIMACS_variables_from_CNF_list_variables.has_key(CNF_variable):
-                    DIMACS_variable = DIMACS_variables_from_CNF_list_variables[CNF_variable]
+                if self.clauses.DIMACS_literal_from_variable.has_key(CNF_variable):
+                    DIMACS_variable = self.clauses.DIMACS_literal_from_variable[CNF_variable]
 
                     DIMACS_literal = negate(DIMACS_variable, negated)
 
