@@ -222,9 +222,10 @@ rule = src.LLS_rules.rule_from_rulestring(args.rule, indent = indent + 1, verbos
 # Add "user_input_" to user's variable names, to prevent collisions"
 if args.rule != None and args.rule.strip()[0] == "{":
     for transition, literal in rule.items():
-        variable, negated = variable_from_literal(literal)
-        literal = negate("user_input_" + variable, negated)
-        rule[transition] = literal
+        if literal not in ["0","1"]:
+            variable, negated = variable_from_literal(literal)
+            literal = negate("user_input_" + variable, negated)
+            rule[transition] = literal
 
 if args.input_file_name:
     #Check current directory and then search_pattern/
