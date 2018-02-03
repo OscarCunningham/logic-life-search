@@ -222,7 +222,7 @@ def preprocess_and_solve(search_pattern,
         )
         number_of_cells = search_pattern.number_of_cells()
         number_of_variables = search_pattern.clauses.number_of_variables
-        number_of_clauses = search_pattern.clauses.number_of_clauses
+        number_of_clauses = len(search_pattern.clauses.clause_set)
         print_message('Number of undetermined cells: ' + str(number_of_cells), indent = indent, verbosity = verbosity)
         print_message('Number of variables: ' + str(number_of_variables), indent = indent, verbosity = verbosity)
         print_message('Number of clauses: ' + str(number_of_clauses) + "\n", indent = indent, verbosity = verbosity)

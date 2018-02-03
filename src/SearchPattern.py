@@ -124,7 +124,7 @@ class SearchPattern:
         assert method == 2 or LLS_rules.rulestring_from_rule(self.rule) == "B3/S23", "Rules other than Life can only use method 2"
 
         print_message("Method: " + str(method), 3, indent = indent + 1, verbosity = verbosity)
-        starting_number_of_clauses = self.clauses.number_of_clauses
+        starting_number_of_clauses = len(self.clauses.clause_set)
         # Iterate over all cells not in the first generation
         for t, generation in enumerate(self.grid):
             if t > 0:
@@ -133,7 +133,7 @@ class SearchPattern:
                         if not self.ignore_transition[t][y][x]:
 
                             if method == 0:
-                                self.clauses.extend(LLS_taocp_variable_scheme.transition_rule(self.grid, x, y, t))
+                                LLS_taocp_variable_scheme.transition_rule(self, x, y, t)
 
                             elif method == 1:
                                 predecessor_cell = self.grid[t - 1][y][x]
@@ -196,7 +196,7 @@ class SearchPattern:
                                         self.clauses.append(implies([negate(transition_literal)] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), negate(cell)))
 
         print_message(
-            "Number of clauses used: " + str(self.clauses.number_of_clauses - starting_number_of_clauses),
+            "Number of clauses used: " + str(len(self.clauses.clause_set) - starting_number_of_clauses),
             3,
             indent = indent + 1, verbosity = verbosity
         )
@@ -225,7 +225,7 @@ class SearchPattern:
 
         print_message("Forcing at least one cell to change between generations " + str(t_0) + " and " + str(t_1) + " ...", 3, indent = indent, verbosity = verbosity)
 
-        starting_number_of_clauses = self.clauses.number_of_clauses
+        starting_number_of_clauses = len(self.clauses.clause_set)
 
         generation_0 = self.grid[t_0]
         generation_1 = self.grid[t_1]
@@ -246,7 +246,7 @@ class SearchPattern:
 
         self.clauses.append(clause)
         print_message(
-            "Number of clauses used: " + str(self.clauses.number_of_clauses - starting_number_of_clauses),
+            "Number of clauses used: " + str(len(self.clauses.clause_set) - starting_number_of_clauses),
             3,
             indent = indent + 1, verbosity = verbosity
         )
@@ -392,18 +392,18 @@ class SearchPattern:
     def force_at_least(self, literals, at_least, indent = 0, verbosity = 0):
         """Adds clauses forcing at least at_least of literals to be true"""
 
-        starting_number_of_clauses = self.clauses.number_of_clauses
+        starting_number_of_clauses = len(self.clauses.clause_set)
         name = self.define_cardinality_variable(literals, at_least)
         self.clauses.append([name])
         print_message(
-            "Number of clauses used: " + str(self.clauses.number_of_clauses - starting_number_of_clauses),
+            "Number of clauses used: " + str(len(self.clauses.clause_set) - starting_number_of_clauses),
             3,
             indent = indent + 1, verbosity = verbosity
         )
 
     def force_at_most(self, literals, at_most, indent = 0, verbosity = 0):
         """Adds clauses forcing at least at_least of literals to be true"""
-
+        
         self.force_at_least(map(negate, literals), len(literals) - at_most, indent = indent, verbosity = verbosity)
 
     def force_symmetry(self, symmetry, indent = 0, verbosity = 0):
