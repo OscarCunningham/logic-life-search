@@ -20,6 +20,7 @@ def LLS(
     parameters=None,
     timeout=None,
     save_dimacs=None,
+    save_state=None,
     method=None,
     force_at_most=[],
     force_at_least=[],
@@ -56,6 +57,7 @@ def LLS(
         parameters = parameters,
         timeout = timeout,
         save_dimacs = save_dimacs,
+        save_state = save_state,
         method = method,
         force_at_most = force_at_most,
         force_at_least = force_at_least,
@@ -151,6 +153,7 @@ def preprocess_and_solve(search_pattern,
     parameters=None,
     timeout=None,
     save_dimacs=None,
+    save_state=None,
     method=None,
     force_at_most=[],
     force_at_least=[],
@@ -185,6 +188,16 @@ def preprocess_and_solve(search_pattern,
             optimise = optimise,
             indent = indent, verbosity = verbosity
         )
+        if save_state:
+            if save_state == True:
+                save_state = "lls_state.pkl"
+            print_message("Saving state...", 3, indent = indent + 1, verbosity = verbosity)
+            LLS_files.file_from_object(
+                save_state,
+                (search_pattern.grid, search_pattern.rule, DIMACS_variables_from_CNF_list_variables),
+                indent = indent + 2, verbosity = verbosity
+            )
+            print_message("Done\n", 3, indent = indent + 1, verbosity = verbosity)
         # Problem statistics
         width = len(search_pattern.grid[0][0])
         height = len(search_pattern.grid[0])
@@ -358,7 +371,6 @@ def preprocess(
             3,
             indent = indent + 1, verbosity = verbosity
         )
-
     (
         DIMACS_string,
         DIMACS_variables_from_CNF_list_variables,

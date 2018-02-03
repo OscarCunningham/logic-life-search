@@ -5,6 +5,7 @@
 import argparse
 import sys
 import os
+import re
 import src.LLS_main
 import src.LLS_search_patterns
 import src.LLS_rules
@@ -169,6 +170,20 @@ parser.add_argument(
     help = "Save the DIMACS file (to the given filename, or to a default if one isn't given)"
 )
 parser.add_argument(
+    "--save_state",
+    nargs = "?",
+    default = None,
+    const = True,
+    help = "Save the state (to the given filename, or to a default if one isn't given)"
+)
+parser.add_argument(
+    "--substitute_solution",
+    nargs = 2,
+    default = None,
+    metavar = ("STATE", "SOLUTION"),
+    help = "Substitute a solution into a saved state"
+)
+parser.add_argument(
     "--dry_run",
     action = "store_true",
     help = "Don't run the solver, but do preprocess."
@@ -204,167 +219,205 @@ print_message('', indent = indent, verbosity = verbosity)
 
 if args.version:
     print_message('Version 0\n', 1, indent = indent, verbosity = verbosity)
+pattern_output_format = args.csv
+output_file_name = args.output_file_name
 
-print_message('Getting search pattern...', indent = indent, verbosity = verbosity)
-
-number_of_search_patterns = sum(map(bool, [
-    args.input_file_name,
-    args.blank_search_pattern,
-    args.agar_crawler_search_pattern,
-    args.check_orphan,
-    args.stator
-]))
-assert number_of_search_patterns < 2, "Too many search patterns specified"
-
-ignore_transition = None # Default value
-rule = src.LLS_rules.rule_from_rulestring(args.rule, indent = indent + 1, verbosity = verbosity)
-
-# Add "user_input_" to user's variable names, to prevent collisions"
-if args.rule != None and args.rule.strip()[0] == "{":
-    for transition, literal in rule.items():
-        if literal not in ["0","1"]:
-            variable, negated = variable_from_literal(literal)
-            literal = negate("user_input_" + variable, negated)
-            rule[transition] = literal
-
-if args.input_file_name:
-    #Check current directory and then search_pattern/
-    print_message(
-        'Creating search pattern from file "' + args.input_file_name + '" ...',
-        3,
-        indent = indent + 1, verbosity = verbosity
+if args.substitute_solution:
+    #Solution has already been found and we just have to sub it back in
+    (
+        grid,
+        rule,
+        DIMACS_variables_from_CNF_list_variables
+    ) = src.LLS_files.object_from_file(
+        args.substitute_solution[0],
+        indent = indent, verbosity = verbosity
     )
-    if os.path.isfile(args.input_file_name):
-        input_string = src.LLS_files.string_from_file(
-            args.input_file_name,
-            indent = indent + 2, verbosity = verbosity
-        )
-    elif os.path.isfile("search_patterns/" + args.input_file_name):
-        input_string = src.LLS_files.string_from_file(
-            "search_patterns/" + args.input_file_name,
-            indent = indent + 2, verbosity = verbosity
-        )
-    else:
-        assert False, "Search pattern file not found"
-    grid, ignore_transition = src.LLS_search_patterns.search_pattern_from_string(
-        input_string,
-        indent = indent + 2, verbosity = verbosity
+    solution = src.LLS_files.string_from_file(args.substitute_solution[1], indent = indent, verbosity = verbosity)
+    solution = re.sub("v ","",re.sub("s ","",solution))
+    search_pattern = SearchPattern(
+        grid,
+        rule = rule,
+        indent = indent, verbosity = verbosity
     )
-    print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
-
-if args.blank_search_pattern:
-    assert len(args.blank_search_pattern) in range(1, 4), "Wrong number of arguments for bounding box"
-    if len(args.blank_search_pattern) == 1:
-        width = args.blank_search_pattern[0]
-        height = args.blank_search_pattern[0]
-        duration = (args.period + 1) if (args.period != None) else 2
-    elif len(args.blank_search_pattern) == 2:
-        width = args.blank_search_pattern[0]
-        height = args.blank_search_pattern[1]
-        duration = (args.period + 1) if (args.period != None) else 2
-    elif len(args.blank_search_pattern) == 3:
-        width = args.blank_search_pattern[0]
-        height = args.blank_search_pattern[1]
-        duration = args.blank_search_pattern[2]
-    grid = src.LLS_search_patterns.blank_search_pattern(width, height, duration, indent = indent + 1, verbosity = verbosity)
-
-if args.agar_crawler_search_pattern:
-    assert len(args.agar_crawler_search_pattern) in range(1, 3), "Wrong number of arguments for bounding box"
-    if args.x_translate == None:
-        args.x_translate = 0
-    if args.y_translate == None:
-        args.y_translate = 0
-    if args.period == None:
-        args.period = 0
-    if len(args.agar_crawler_search_pattern) == 1:
-        width = args.agar_crawler_search_pattern[0]
-        height = args.agar_crawler_search_pattern[0]
-    elif len(args.agar_crawler_search_pattern) == 2:
-        width = args.agar_crawler_search_pattern[0]
-        height = args.agar_crawler_search_pattern[1]
-    grid, ignore_transition = src.LLS_search_patterns.crawler_search_pattern(
-        width,
-        height,
-        args.x_translate,
-        args.y_translate,
-        args.period,
-        args.agar_offset,
-        indent = indent + 1, verbosity = verbosity
+    solution = search_pattern.substitute_solution(
+        solution,
+        DIMACS_variables_from_CNF_list_variables,
+        indent = indent, verbosity = verbosity
     )
-    args.x_translate = None
-    args.y_translate = None
-    args.period = None
+    output_string = solution.make_string(
+        pattern_output_format = pattern_output_format,
+        determined = search_pattern.deterministic(),
+        indent = indent, verbosity = verbosity
+    )
+    print_message(output_string + "\n", 1, indent = indent, verbosity = verbosity)
+    if output_file_name:
+        print_message('Writing to output file...', indent = indent, verbosity = verbosity)
+        src.LLS_files.append_to_file_from_string(output_file_name, output_string, indent = indent + 1, verbosity = verbosity)
+        print_message('Done\n', indent = indent, verbosity = verbosity)
 
-if args.check_orphan:
-    if os.path.isfile(args.check_orphan[0]):
-        file_name = args.check_orphan[0]
-    elif os.path.isfile("search_patterns/" + args.check_orphan[0]):
-        file_name = "search_patterns/" + args.check_orphan[0]
-    else:
-        assert False, "Search pattern file not found"
-    if len(args.check_orphan) == 2:
-        number_of_generations = int(args.check_orphan[1])
-    else:
-        number_of_generations = 1
-    grid, ignore_transition = src.LLS_search_patterns.check_orphan(file_name, number_of_generations, indent = indent + 1, verbosity = verbosity)
+else:
+    print_message('Getting search pattern...', indent = indent, verbosity = verbosity)
 
-if args.stator:
-    if os.path.isfile(args.stator[0]):
-        file_name = args.stator[0]
-    elif os.path.isfile("search_patterns/" + args.stator[0]):
-        file_name = "search_patterns/" + args.stator[0]
-    else:
-        assert False, "Search pattern file not found"
-    grid, _ = src.LLS_formatting.parse_input_string(
-        src.LLS_files.string_from_file(
-            file_name,
+    number_of_search_patterns = sum(map(bool, [
+        args.input_file_name,
+        args.blank_search_pattern,
+        args.agar_crawler_search_pattern,
+        args.check_orphan,
+        args.stator
+    ]))
+    assert number_of_search_patterns < 2, "Too many search patterns specified"
+
+    ignore_transition = None # Default value
+    rule = src.LLS_rules.rule_from_rulestring(args.rule, indent = indent + 1, verbosity = verbosity)
+
+    # Add "user_input_" to user's variable names, to prevent collisions"
+    if args.rule != None and args.rule.strip()[0] == "{":
+        for transition, literal in rule.items():
+            if literal not in ["0","1"]:
+                variable, negated = variable_from_literal(literal)
+                literal = negate("user_input_" + variable, negated)
+                rule[transition] = literal
+
+    if args.input_file_name:
+        #Check current directory and then search_pattern/
+        print_message(
+            'Creating search pattern from file "' + args.input_file_name + '" ...',
+            3,
             indent = indent + 1, verbosity = verbosity
-        ),
-    indent = indent + 1, verbosity = verbosity)
-    grid = src.LLS_search_patterns.stator_search_pattern(grid[0], rule, indent = indent + 1, verbosity = verbosity)
+        )
+        if os.path.isfile(args.input_file_name):
+            input_string = src.LLS_files.string_from_file(
+                args.input_file_name,
+                indent = indent + 2, verbosity = verbosity
+            )
+        elif os.path.isfile("search_patterns/" + args.input_file_name):
+            input_string = src.LLS_files.string_from_file(
+                "search_patterns/" + args.input_file_name,
+                indent = indent + 2, verbosity = verbosity
+            )
+        else:
+            assert False, "Search pattern file not found"
+        grid, ignore_transition = src.LLS_search_patterns.search_pattern_from_string(
+            input_string,
+            indent = indent + 2, verbosity = verbosity
+        )
+        print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
 
-if number_of_search_patterns == 0:
-    print_message(
-        '\nNo pattern specified, getting from STDIN... (End with EOF character)\n',
-        2,
+    if args.blank_search_pattern:
+        assert len(args.blank_search_pattern) in range(1, 4), "Wrong number of arguments for bounding box"
+        if len(args.blank_search_pattern) == 1:
+            width = args.blank_search_pattern[0]
+            height = args.blank_search_pattern[0]
+            duration = (args.period + 1) if (args.period != None) else 2
+        elif len(args.blank_search_pattern) == 2:
+            width = args.blank_search_pattern[0]
+            height = args.blank_search_pattern[1]
+            duration = (args.period + 1) if (args.period != None) else 2
+        elif len(args.blank_search_pattern) == 3:
+            width = args.blank_search_pattern[0]
+            height = args.blank_search_pattern[1]
+            duration = args.blank_search_pattern[2]
+        grid = src.LLS_search_patterns.blank_search_pattern(width, height, duration, indent = indent + 1, verbosity = verbosity)
+
+    if args.agar_crawler_search_pattern:
+        assert len(args.agar_crawler_search_pattern) in range(1, 3), "Wrong number of arguments for bounding box"
+        if args.x_translate == None:
+            args.x_translate = 0
+        if args.y_translate == None:
+            args.y_translate = 0
+        if args.period == None:
+            args.period = 0
+        if len(args.agar_crawler_search_pattern) == 1:
+            width = args.agar_crawler_search_pattern[0]
+            height = args.agar_crawler_search_pattern[0]
+        elif len(args.agar_crawler_search_pattern) == 2:
+            width = args.agar_crawler_search_pattern[0]
+            height = args.agar_crawler_search_pattern[1]
+        grid, ignore_transition = src.LLS_search_patterns.crawler_search_pattern(
+            width,
+            height,
+            args.x_translate,
+            args.y_translate,
+            args.period,
+            args.agar_offset,
+            indent = indent + 1, verbosity = verbosity
+        )
+        args.x_translate = None
+        args.y_translate = None
+        args.period = None
+
+    if args.check_orphan:
+        if os.path.isfile(args.check_orphan[0]):
+            file_name = args.check_orphan[0]
+        elif os.path.isfile("search_patterns/" + args.check_orphan[0]):
+            file_name = "search_patterns/" + args.check_orphan[0]
+        else:
+            assert False, "Search pattern file not found"
+        if len(args.check_orphan) == 2:
+            number_of_generations = int(args.check_orphan[1])
+        else:
+            number_of_generations = 1
+        grid, ignore_transition = src.LLS_search_patterns.check_orphan(file_name, number_of_generations, indent = indent + 1, verbosity = verbosity)
+
+    if args.stator:
+        if os.path.isfile(args.stator[0]):
+            file_name = args.stator[0]
+        elif os.path.isfile("search_patterns/" + args.stator[0]):
+            file_name = "search_patterns/" + args.stator[0]
+        else:
+            assert False, "Search pattern file not found"
+        grid, _ = src.LLS_formatting.parse_input_string(
+            src.LLS_files.string_from_file(
+                file_name,
+                indent = indent + 1, verbosity = verbosity
+            ),
+        indent = indent + 1, verbosity = verbosity)
+        grid = src.LLS_search_patterns.stator_search_pattern(grid[0], rule, indent = indent + 1, verbosity = verbosity)
+
+    if number_of_search_patterns == 0:
+        print_message(
+            '\nNo pattern specified, getting from STDIN... (End with EOF character)\n',
+            2,
+            indent = indent + 1, verbosity = verbosity
+        )
+        input_string = sys.stdin.read()
+        print_message('\n', 1, indent = indent + 1, verbosity = verbosity)
+        grid, ignore_transition = src.LLS_search_patterns.search_pattern_from_string(input_string, indent = indent + 1, verbosity = verbosity)
+
+    # Create the search pattern
+    search_pattern = SearchPattern(
+        grid,
+        ignore_transition = ignore_transition,
+        rule = rule,
         indent = indent + 1, verbosity = verbosity
     )
-    input_string = sys.stdin.read()
-    print_message('\n', 1, indent = indent + 1, verbosity = verbosity)
-    grid, ignore_transition = src.LLS_search_patterns.search_pattern_from_string(input_string, indent = indent + 1, verbosity = verbosity)
 
-# Create the search pattern
-search_pattern = SearchPattern(
-    grid,
-    ignore_transition = ignore_transition,
-    rule = rule,
-    indent = indent + 1, verbosity = verbosity
-)
+    print_message('Done\n', indent = indent, verbosity = verbosity)
 
-print_message('Done\n', indent = indent, verbosity = verbosity)
 
-# LLS_main.LLS does all the hard work
-src.LLS_main.LLS(
-    search_pattern,
-    symmetry = args.symmetry,
-    period = args.period,
-    x_translate = args.x_translate,
-    y_translate = args.y_translate,
-    force_movement = args.force_movement,
-    solver = args.solver,
-    parameters = args.parameters,
-    timeout = args.timeout,
-    save_dimacs = args.save_dimacs,
-    method = args.method,
-    force_at_most = args.force_at_most,
-    force_at_least = args.force_at_least,
-    force_change = args.force_change,
-    force_nonempty = args.force_nonempty,
-    force_evolution = True,
-    dry_run = args.dry_run,
-    optimise = None if not (args.optimise ^ args.no_optimise) else args.optimise,
-    number_of_solutions = args.number_of_solutions,
-    pattern_output_format = args.csv,
-    output_file_name = args.output_file_name,
-    indent = indent, verbosity = verbosity
-)
+    # LLS_main.LLS does all the hard work
+    src.LLS_main.LLS(
+        search_pattern,
+        symmetry = args.symmetry,
+        period = args.period,
+        x_translate = args.x_translate,
+        y_translate = args.y_translate,
+        force_movement = args.force_movement,
+        solver = args.solver,
+        parameters = args.parameters,
+        timeout = args.timeout,
+        save_dimacs = args.save_dimacs,
+        save_state = args.save_state,
+        method = args.method,
+        force_at_most = args.force_at_most,
+        force_at_least = args.force_at_least,
+        force_change = args.force_change,
+        force_nonempty = args.force_nonempty,
+        force_evolution = True,
+        dry_run = args.dry_run,
+        optimise = None if not (args.optimise ^ args.no_optimise) else args.optimise,
+        number_of_solutions = args.number_of_solutions,
+        pattern_output_format = pattern_output_format,
+        output_file_name = output_file_name,
+        indent = indent, verbosity = verbosity
+    )
