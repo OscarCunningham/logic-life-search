@@ -1,3 +1,4 @@
+import os
 import LLS_files
 import LLS_formatting
 import LLS_DIMACS
@@ -188,11 +189,17 @@ def preprocess_and_solve(search_pattern,
             indent = indent, verbosity = verbosity
         )
         if save_state:
-            if save_state == True:
-                save_state = "lls_state.pkl"
+            if isinstance(save_state, basestring):
+                state_file = save_state
+            else:
+                state_file = "lls_state.pkl"
+                file_number = 0
+                while os.path.isfile(state_file):
+                    file_number += 1
+                    state_file = "lls_state" + str(file_number) + ".pkl"
             print_message("Saving state...", 3, indent = indent + 1, verbosity = verbosity)
             LLS_files.file_from_object(
-                save_state,
+                state_file,
                 (search_pattern.grid, search_pattern.ignore_transition, search_pattern.rule, DIMACS_variables_from_CNF_list_variables),
                 indent = indent + 2, verbosity = verbosity
             )
