@@ -226,6 +226,7 @@ if args.substitute_solution:
     #Solution has already been found and we just have to sub it back in
     (
         grid,
+        ignore_transition,
         rule,
         DIMACS_variables_from_CNF_list_variables
     ) = src.LLS_files.object_from_file(
@@ -236,6 +237,7 @@ if args.substitute_solution:
     solution = re.sub("v ","",re.sub("s ","",solution))
     search_pattern = SearchPattern(
         grid,
+        ignore_transition = ignore_transition,
         rule = rule,
         indent = indent, verbosity = verbosity
     )
@@ -391,6 +393,7 @@ else:
         rule = rule,
         indent = indent + 1, verbosity = verbosity
     )
+    search_pattern.standardise_varaibles_names(indent = indent + 1, verbosity = verbosity)
 
     print_message('Done\n', indent = indent, verbosity = verbosity)
 

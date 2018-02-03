@@ -26,8 +26,6 @@ class SearchPattern:
         assert len(self.grid[0]) == len(self.ignore_transition[0]), "Heights of grid and ignore_transition don't match"
         assert len(self.grid[0][0]) == len(self.ignore_transition[0][0]), "Widths of grid and ignore_transition don't match"
 
-        self.standardise_varaibles_names(indent = indent, verbosity = verbosity)
-
     def __eq__(self, other):
         if other == None:
             return False
@@ -784,7 +782,7 @@ class SearchPattern:
 
         # Remove the first line that just says "SAT", and split into a list of literals
         solution = set(solution.split("\n")[1].split())
-
+        
         for t, generation in enumerate(grid):
             for y, row in enumerate(generation):
                 for x, cell in enumerate(row):

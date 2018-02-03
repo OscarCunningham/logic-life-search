@@ -3,7 +3,6 @@ import LLS_formatting
 import LLS_DIMACS
 import LLS_SAT_solvers
 import LLS_defaults
-from SearchPattern import SearchPattern
 from UnsatInPreprocessing import UnsatInPreprocessing
 from LLS_messages import print_message
 from LLS_literal_manipulation import negate
@@ -194,7 +193,7 @@ def preprocess_and_solve(search_pattern,
             print_message("Saving state...", 3, indent = indent + 1, verbosity = verbosity)
             LLS_files.file_from_object(
                 save_state,
-                (search_pattern.grid, search_pattern.rule, DIMACS_variables_from_CNF_list_variables),
+                (search_pattern.grid, search_pattern.ignore_transition, search_pattern.rule, DIMACS_variables_from_CNF_list_variables),
                 indent = indent + 2, verbosity = verbosity
             )
             print_message("Done\n", 3, indent = indent + 1, verbosity = verbosity)
