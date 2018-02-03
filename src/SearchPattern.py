@@ -714,7 +714,8 @@ class SearchPattern:
 
 
 
-    def deterministic(self):
+    def deterministic(self, indent = 0, verbosity = 0):
+        print_message("Checking if pattern is deterministic...", 3, indent = indent, verbosity = verbosity)
         determined = [[[False for cell in row] for row in generation] for generation in self.grid]
         determined_variables = set()
         width = len(self.grid[0][0])
@@ -725,21 +726,23 @@ class SearchPattern:
             for t, generation in enumerate(self.grid):
                 for y, row in enumerate(generation):
                     for x, cell in enumerate(row):
-                        if cell in ["0", "1"]:
-                            determined[t][y][x] = True
-                        else:
-                            variable, negated = variable_from_literal(cell)
-                            if t == 0:
+                        if not determined[t][y][x]:
+                            if cell in ["0", "1"]:
                                 determined[t][y][x] = True
-                                determined_variables.add(variable)
-                            elif all(determined[t -1][y + y_offset][x + x_offset] for x_offset in range(2) for y_offset in range(2) if x + x_offset in range(width) and y + y_offset in range(height)) and not self.ignore_transition[t][y][x]:
-                                determined[t][y][x] = True
-                                determined_variables.add(variable)
-                            elif variable in determined_variables:
-                                determined[t][y][x] = True
+                            else:
+                                variable, negated = variable_from_literal(cell)
+                                if t == 0:
+                                    determined[t][y][x] = True
+                                    determined_variables.add(variable)
+                                elif variable in determined_variables:
+                                    determined[t][y][x] = True
+                                elif all(determined[t -1][y + y_offset][x + x_offset] for x_offset in range(2) for y_offset in range(2) if x + x_offset in range(width) and y + y_offset in range(height)) and not self.ignore_transition[t][y][x]:
+                                    determined[t][y][x] = True
+                                    determined_variables.add(variable)
             if determined == determined_copy:
                 break
 
+        print_message("Done\n", 3, indent = indent, verbosity = verbosity)
         if all(flag for generation in determined for row in generation for flag in row):
             return True
         else:

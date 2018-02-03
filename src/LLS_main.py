@@ -67,7 +67,7 @@ def LLS(
     )
 
     # Check if the first generation of pattern determines the others
-    determined = search_pattern.deterministic()
+    determined = search_pattern.deterministic(indent = indent, verbosity = verbosity)
 
     solutions = []
 
