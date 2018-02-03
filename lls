@@ -189,16 +189,6 @@ parser.add_argument(
     help = "Don't run the solver, but do preprocess."
 )
 parser.add_argument(
-    "--no_optimise",
-    action = "store_true",
-    help = "Don't do any optimisation."
-)
-parser.add_argument(
-    "--optimise",
-    action = "store_true",
-    help = "Don't do any optimisation."
-)
-parser.add_argument(
     '--parameters',
     type = str,
     default = None,
@@ -418,7 +408,6 @@ else:
         force_nonempty = args.force_nonempty,
         force_evolution = True,
         dry_run = args.dry_run,
-        optimise = None if not (args.optimise ^ args.no_optimise) else args.optimise,
         number_of_solutions = args.number_of_solutions,
         pattern_output_format = pattern_output_format,
         output_file_name = output_file_name,

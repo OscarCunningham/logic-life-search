@@ -78,33 +78,10 @@ class SearchPattern:
     def number_of_cells(self):
         return len(set(variable_from_literal(cell) for generation in self.grid for row in generation for cell in row if cell not in ["0", "1"]))
 
-    def optimise(self, grid_changed = True, clauses_changed = True, indent = 0, verbosity = 0):
-        print_message("Optimising search pattern...", 3, indent = indent, verbosity = verbosity)
-        number_of_improvements = 0
-        while grid_changed or clauses_changed:
-            number_of_improvements += 1
-            print_message("Improving search pattern (Pass " + str(number_of_improvements) + ") ...", 3, indent = indent + 1, verbosity = verbosity)
-            grid_changed0 = False
-            clauses_changed0 = False
-            if grid_changed:
-                grid_changed1, clauses_changed1, _ = self.improve_grid(indent = indent + 2, verbosity = verbosity)
-                grid_changed0 = grid_changed0 or grid_changed1
-                clauses_changed0 = clauses_changed0 or clauses_changed1
-            if clauses_changed:
-                grid_changed1, clauses_changed1, _ = self.improve_clauses(indent = indent + 2, verbosity = verbosity)
-                grid_changed0 = grid_changed0 or grid_changed1
-                clauses_changed0 = clauses_changed0 or clauses_changed1
-            grid_changed = grid_changed0
-            clauses_changed = clauses_changed0
-            print_message("Done\n", 3, indent = indent + 1, verbosity = verbosity)
-        self.standardise_varaibles_names()
-        print_message("Done\n", 3, indent = indent, verbosity = verbosity)
-
-    def improve_grid(self, gentle=False, indent = 0, verbosity = 0):
+    def improve_grid(self, indent = 0, verbosity = 0):
         print_message("Improving grid...", 3, indent = indent, verbosity = verbosity)
         parents_dict = {}
         to_force_equal = []
-        grid_changed0 = False
         outer_totalistic = LLS_rules.outer_totalistic(self.rule)
         for t, generation in enumerate(self.grid):
             if t > 0:
@@ -118,8 +95,6 @@ class SearchPattern:
                             parents_string = str(parents)
                             if parents_dict.has_key(parents_string):
                                 self.grid[t][y][x] = parents_dict[parents_string]
-                                if self.grid[t][y][x] != cell:
-                                    grid_changed0 = True
                                 to_force_equal.append((parents_dict[parents_string],cell))
                                 self.ignore_transition[t][y][x] = True
                             elif all(parent in ["0", "1"] for parent in parents):
@@ -127,163 +102,95 @@ class SearchPattern:
                                 transition = LLS_rules.transition_from_cells(neighbours)
                                 child = self.rule[BS_letter + transition]
                                 self.grid[t][y][x] = child
-                                if self.grid[t][y][x] != cell:
-                                    grid_changed0 = True
                                 to_force_equal.append((cell, child))
                                 self.ignore_transition[t][y][x] = True
                                 parents_dict[parents_string] = child
                             else:
                                 parents_dict[parents_string] = cell
-                                if not gentle:
-                                    variables = []
-                                    for literal in [cell, predecessor_cell] + neighbours:
-                                        if literal not in ["0", "1"]:
-                                            variable, _ = variable_from_literal(literal)
-                                            if variable not in variables:
-                                                variables.append(variable)
-                                    booleans = [False, True]
+                                variables = []
+                                for literal in [cell, predecessor_cell] + neighbours:
+                                    if literal not in ["0", "1"]:
+                                        variable, _ = variable_from_literal(literal)
+                                        if variable not in variables:
+                                            variables.append(variable)
+                                booleans = [False, True]
 
-                                    transition_redundant = True
+                                transition_redundant = True
 
-                                    variables_true = set(range(len(variables)))
-                                    variables_false = set(range(len(variables)))
-                                    variables_equal = set(itertools.combinations(range(len(variables)),2))
-                                    variables_unequal = set(itertools.combinations(range(len(variables)),2))
+                                variables_true = set(range(len(variables)))
+                                variables_false = set(range(len(variables)))
+                                variables_equal = set(itertools.combinations(range(len(variables)),2))
+                                variables_unequal = set(itertools.combinations(range(len(variables)),2))
 
-                                    for variables_alive in itertools.product(booleans, repeat=len(variables)):
-                                        dead_literals = map(negate, variables, variables_alive)
-                                        if cell == "0":
-                                            cell_alive = False
-                                        elif cell not in dead_literals:
-                                            cell_alive = True
+                                for variables_alive in itertools.product(booleans, repeat=len(variables)):
+                                    dead_literals = map(negate, variables, variables_alive)
+                                    if cell == "0":
+                                        cell_alive = False
+                                    elif cell not in dead_literals:
+                                        cell_alive = True
+                                    else:
+                                        cell_alive = False
+
+                                    if predecessor_cell == "0":
+                                        predecessor_cell_alive = False
+                                    elif predecessor_cell not in dead_literals:
+                                        predecessor_cell_alive = True
+                                    else:
+                                        predecessor_cell_alive = False
+
+                                    neighbours_alive = []
+                                    for neighbour in neighbours:
+                                        if neighbour == "0":
+                                            neighbours_alive.append(False)
+                                        elif neighbour not in dead_literals:
+                                            neighbours_alive.append(True)
                                         else:
-                                            cell_alive = False
+                                            neighbours_alive.append(False)
 
-                                        if predecessor_cell == "0":
-                                            predecessor_cell_alive = False
-                                        elif predecessor_cell not in dead_literals:
-                                            predecessor_cell_alive = True
-                                        else:
-                                            predecessor_cell_alive = False
-
-                                        neighbours_alive = []
-                                        for neighbour in neighbours:
-                                            if neighbour == "0":
-                                                neighbours_alive.append(False)
-                                            elif neighbour not in dead_literals:
-                                                neighbours_alive.append(True)
-                                            else:
-                                                neighbours_alive.append(False)
-
-                                        BS_letter = "S" if predecessor_cell_alive else "B"
-                                        transition = LLS_rules.transition_from_cells(neighbours_alive)
-                                        transition_variable = self.rule[BS_letter + transition]
+                                    BS_letter = "S" if predecessor_cell_alive else "B"
+                                    transition = LLS_rules.transition_from_cells(neighbours_alive)
+                                    transition_variable = self.rule[BS_letter + transition]
 
 
-                                        if (transition_variable not in ["0", "1"]) or (transition_variable == "0" and not cell_alive) or (transition_variable == "1" and cell_alive):
-                                            to_remove = []
-                                            for variable_number in variables_true:
-                                                if not variables_alive[variable_number]:
-                                                    to_remove.append(variable_number)
-                                            variables_true.difference_update(to_remove)
+                                    if (transition_variable not in ["0", "1"]) or (transition_variable == "0" and not cell_alive) or (transition_variable == "1" and cell_alive):
+                                        to_remove = []
+                                        for variable_number in variables_true:
+                                            if not variables_alive[variable_number]:
+                                                to_remove.append(variable_number)
+                                        variables_true.difference_update(to_remove)
 
-                                            to_remove = []
-                                            for variable_number in variables_false:
-                                                if variables_alive[variable_number]:
-                                                    to_remove.append(variable_number)
-                                            variables_false.difference_update(to_remove)
+                                        to_remove = []
+                                        for variable_number in variables_false:
+                                            if variables_alive[variable_number]:
+                                                to_remove.append(variable_number)
+                                        variables_false.difference_update(to_remove)
 
-                                            to_remove = []
-                                            for variable_number_0, variable_number_1 in variables_equal:
-                                                if variables_alive[variable_number_0] != variables_alive[variable_number_1]:
-                                                    to_remove.append((variable_number_0, variable_number_1))
-                                            variables_equal.difference_update(to_remove)
+                                        to_remove = []
+                                        for variable_number_0, variable_number_1 in variables_equal:
+                                            if variables_alive[variable_number_0] != variables_alive[variable_number_1]:
+                                                to_remove.append((variable_number_0, variable_number_1))
+                                        variables_equal.difference_update(to_remove)
 
-                                            to_remove = []
-                                            for variable_number_0, variable_number_1 in variables_unequal:
-                                                if variables_alive[variable_number_0] == variables_alive[variable_number_1]:
-                                                    to_remove.append((variable_number_0, variable_number_1))
-                                            variables_unequal.difference_update(to_remove)
+                                        to_remove = []
+                                        for variable_number_0, variable_number_1 in variables_unequal:
+                                            if variables_alive[variable_number_0] == variables_alive[variable_number_1]:
+                                                to_remove.append((variable_number_0, variable_number_1))
+                                        variables_unequal.difference_update(to_remove)
 
-                                        if (transition_variable not in ["0", "1"]) or (transition_variable == "0" and cell_alive) or (transition_variable == "1" and not cell_alive):
-                                            transition_redundant = False
-                                    if transition_redundant:
-                                        self.ignore_transition[t][y][x] = True
-                                    for variable_number in variables_true:
-                                        to_force_equal.append((variables[variable_number], "1"))
-                                    for variable_number in variables_false:
-                                        to_force_equal.append((variables[variable_number], "0"))
-                                    for variable_number_0, variable_number_1 in variables_equal:
-                                        to_force_equal.append((variables[variable_number_0], variables[variable_number_1]))
-                                    for variable_number_0, variable_number_1 in variables_unequal:
-                                        to_force_equal.append((variables[variable_number_0], negate(variables[variable_number_1])))
-        grid_changed1, clauses_changed, rule_changed = self.force_equal(to_force_equal)
-        grid_changed = grid_changed0 or grid_changed1
+                                    if (transition_variable not in ["0", "1"]) or (transition_variable == "0" and cell_alive) or (transition_variable == "1" and not cell_alive):
+                                        transition_redundant = False
+                                if transition_redundant:
+                                    self.ignore_transition[t][y][x] = True
+                                for variable_number in variables_true:
+                                    to_force_equal.append((variables[variable_number], "1"))
+                                for variable_number in variables_false:
+                                    to_force_equal.append((variables[variable_number], "0"))
+                                for variable_number_0, variable_number_1 in variables_equal:
+                                    to_force_equal.append((variables[variable_number_0], variables[variable_number_1]))
+                                for variable_number_0, variable_number_1 in variables_unequal:
+                                    to_force_equal.append((variables[variable_number_0], negate(variables[variable_number_1])))
+        self.force_equal(to_force_equal)
         print_message("Done\n", 3, indent = indent, verbosity = verbosity)
-        return grid_changed, clauses_changed, rule_changed
-
-    def improve_clauses(self, indent = 0, verbosity = 0):
-
-        print_message("Improving clause list...", 3, indent = indent, verbosity = verbosity)
-
-        print_message('Tidying clauses...', 3, indent = indent + 1, verbosity = verbosity)
-        clauses_to_remove = set()
-        to_force_equal = []
-        clauses_seen_so_far = set()
-        clauses_changed0 = False
-        for clause_number, clause in enumerate(self.clauses):
-            remove_flag = False
-            if "1" in clause:
-                remove_flag = True
-            else:
-                for literal in clause:
-                    if negate(literal) in clause:
-                        remove_flag = True
-            if remove_flag:
-                clauses_to_remove.add(clause_number)
-            else:
-                starting_length = len(self.clauses[clause_number])
-                self.clauses[clause_number] = [literal for literal in sorted(list(set(clause))) if literal != "0"]
-                number_of_literals = len(self.clauses[clause_number])
-                if starting_length != number_of_literals:
-                    clauses_changed0 = True
-                if number_of_literals == 1:
-                    to_force_equal.append((self.clauses[clause_number][0],"1"))
-                elif number_of_literals == 2:
-                    if str(sorted([negate(self.clauses[clause_number][0]), negate(self.clauses[clause_number][1])])) in clauses_seen_so_far:
-                        to_force_equal.append((self.clauses[clause_number][0],negate(self.clauses[clause_number][1])))
-                    elif str(sorted([self.clauses[clause_number][0], negate(self.clauses[clause_number][1])])) in clauses_seen_so_far:
-                        to_force_equal.append((self.clauses[clause_number][0],"1"))
-                    elif str(sorted([negate(self.clauses[clause_number][0]), self.clauses[clause_number][1]])) in clauses_seen_so_far:
-                        to_force_equal.append((self.clauses[clause_number][1],"1"))
-                    else:
-                        clauses_seen_so_far.add(str(self.clauses[clause_number]))
-        if clauses_to_remove:
-            clauses_changed0 = True
-        self.clauses = [clause for clause_number, clause in enumerate(self.clauses) if clause_number not in clauses_to_remove]
-        print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
-
-        print_message('Removing duplicate clauses...', 3, indent = indent + 1, verbosity = verbosity)
-        seen = set()
-        temporary_list = []
-        for clause in self.clauses:
-            clause.sort()
-            clause_string = str(clause)
-            if clause_string not in seen:
-                seen.add(clause_string)
-                temporary_list.append(clause)
-            else:
-                clauses_changed0 = True
-        self.clauses = temporary_list
-        print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
-
-        print_message('Making deductions...', 3, indent = indent + 1, verbosity = verbosity)
-        grid_changed, clauses_changed1, rule_changed = self.force_equal(to_force_equal)
-        print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
-        clauses_changed = clauses_changed0 or clauses_changed1
-        print_message("Done\n", 3, indent = indent, verbosity = verbosity)
-
-        return grid_changed, clauses_changed, rule_changed
 
 
     def force_evolution(self, method=None, indent = 0, verbosity = 0):
@@ -622,15 +529,11 @@ class SearchPattern:
 
     def force_equal(self, argument_0, argument_1 = None):
 
-        grid_changed = False
-        clauses_changed = False
-        rule_changed = False
-
         if argument_1 != None:
             assert isinstance(argument_0, basestring) and isinstance(argument_1, basestring), "force_equal arguments not understood"
             cell_pair_list = [(argument_0, argument_1)]
         elif argument_0 == []:
-            return grid_changed, clauses_changed, rule_changed
+            return
         elif isinstance(argument_0[0], basestring):
                 assert len(argument_0) == 2 and isinstance(argument_0[1], basestring), "force_equal arguments not understood"
                 cell_pair_list = [argument_0]
@@ -687,7 +590,6 @@ class SearchPattern:
                         variable, negated = variable_from_literal(cell)
                         if replacement.has_key(variable):
                             if replacement[variable] != variable:
-                                grid_changed = True
                                 self.grid[t][y][x] = negate(replacement[variable], negated)
 
         for clause_number, clause in enumerate(self.clauses):
@@ -696,7 +598,6 @@ class SearchPattern:
                     variable, negated = variable_from_literal(literal)
                     if replacement.has_key(variable):
                         if replacement[variable] != variable:
-                            clauses_changed = True
                             self.clauses[clause_number][literal_number] = negate(replacement[variable], negated)
 
         for transition, literal in self.rule.items():
@@ -704,10 +605,7 @@ class SearchPattern:
                 variable, negated = variable_from_literal(literal)
                 if replacement.has_key(variable):
                     if replacement[variable] != variable:
-                        rule_changed = True
                         self.rule[transition] = negate(replacement[variable], negated)
-
-        return grid_changed, clauses_changed, rule_changed
 
     def force_period(self, period, x_translate = None, y_translate = None, indent = 0, verbosity = 0):
 
@@ -782,7 +680,7 @@ class SearchPattern:
 
         # Remove the first line that just says "SAT", and split into a list of literals
         solution = set(solution.split("\n")[1].split())
-        
+
         for t, generation in enumerate(grid):
             for y, row in enumerate(generation):
                 for x, cell in enumerate(row):

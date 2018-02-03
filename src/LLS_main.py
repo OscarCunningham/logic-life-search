@@ -28,7 +28,6 @@ def LLS(
     force_nonempty=False,
     force_evolution=True,
     dry_run=False,
-    optimise = None,
     number_of_solutions=None,
     pattern_output_format=None,
     output_file_name=None,
@@ -65,7 +64,6 @@ def LLS(
         force_nonempty = force_nonempty,
         force_evolution = force_evolution,
         dry_run = dry_run,
-        optimise = optimise,
         indent = indent, verbosity = verbosity
     )
 
@@ -118,7 +116,6 @@ def LLS(
                 timeout = timeout,
                 method = method,
                 force_evolution = False,
-                optimise = optimise,
                 indent = indent, verbosity = verbosity
             )
             time_taken += extra_time_taken
@@ -161,7 +158,6 @@ def preprocess_and_solve(search_pattern,
     force_nonempty=False,
     force_evolution=True,
     dry_run=False,
-    optimise=None,
     indent=0, verbosity=0
 ):
     """Preprocess and solve the search pattern"""
@@ -185,7 +181,6 @@ def preprocess_and_solve(search_pattern,
             force_change = force_change,
             force_nonempty = force_nonempty,
             force_evolution = force_evolution,
-            optimise = optimise,
             indent = indent, verbosity = verbosity
         )
         if save_state:
@@ -299,7 +294,6 @@ def preprocess(
     force_change=[],
     force_nonempty=False,
     force_evolution=True,
-    optimise=LLS_defaults.optimise,
     indent=0, verbosity=0
 ):
     """Apply constraints and create SAT problem"""
@@ -351,32 +345,21 @@ def preprocess(
         literals = [literal for t in ts for row in search_pattern.grid[t] for literal in row]
         search_pattern.force_at_most(literals, amount, indent = indent+1, verbosity = verbosity)
         print_message('Done\n', 3, indent = indent+1, verbosity = verbosity)
-    if optimise:
-        search_pattern.optimise(indent = indent + 1, verbosity = verbosity)
-    else:
-        print_message(
-            'Preparing search grid ...',
-            3,
-            indent = indent+1, verbosity = verbosity
-        )
-        search_pattern.improve_grid(gentle = True, verbosity = 0)
-        print_message(
-            'Done\n',
-            3,
-            indent = indent+1, verbosity = verbosity
-        )
+
+    print_message(
+        'Preparing search grid ...',
+        3,
+        indent = indent+1, verbosity = verbosity
+    )
+    search_pattern.improve_grid(verbosity = 0)
+    print_message(
+        'Done\n',
+        3,
+        indent = indent+1, verbosity = verbosity
+    )
     if force_evolution:
         # The most important bit. Enforces the evolution rules
         search_pattern.force_evolution(method=method, indent = indent + 1, verbosity = verbosity)
-        # Optimise again, this time we know the grid hasn't changed
-        if optimise:
-            search_pattern.optimise(grid_changed = False, clauses_changed = True, indent = indent + 1, verbosity = verbosity)
-    if optimise:
-        print_message(
-            "Search pattern optimised to:\n" + search_pattern.make_string(pattern_output_format = "csv") + "\n",
-            3,
-            indent = indent + 1, verbosity = verbosity
-        )
     (
         DIMACS_string,
         DIMACS_variables_from_CNF_list_variables,
