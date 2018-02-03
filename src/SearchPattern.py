@@ -72,8 +72,8 @@ class SearchPattern:
     def number_of_cells(self):
         return len(set(variable_from_literal(cell) for generation in self.grid for row in generation for cell in row if cell not in ["0", "1"]))
 
-    def improve_grid(self, indent = 0, verbosity = 0):
-        print_message("Improving grid...", 3, indent = indent, verbosity = verbosity)
+    def remove_redundancies(self, indent = 0, verbosity = 0):
+        print_message("Removing redundant transitions...", 3, indent = indent, verbosity = verbosity)
         parents_dict = {}
         to_force_equal = []
         outer_totalistic = LLS_rules.outer_totalistic(self.rule)

@@ -292,8 +292,14 @@ def preprocess(
 ):
     """Apply constraints and create SAT problem"""
     print_message('Preprocessing...', indent = indent, verbosity = verbosity)
+
+    # Constraints that change the grid
     search_pattern.force_symmetry(symmetry, indent = indent + 1, verbosity = verbosity)
     search_pattern.force_period(period, x_translate, y_translate, indent = indent + 1, verbosity = verbosity)
+
+    search_pattern.remove_redundancies(indent = indent + 1, verbosity = verbosity)
+
+    #Constraints that are enforced by clauses
     if force_nonempty:
         search_pattern.force_nonempty(indent = indent + 1, verbosity = verbosity)
     if force_movement:
@@ -340,17 +346,7 @@ def preprocess(
         search_pattern.force_at_most(literals, amount, indent = indent+1, verbosity = verbosity)
         print_message('Done\n', 3, indent = indent+1, verbosity = verbosity)
 
-    print_message(
-        'Preparing search grid ...',
-        3,
-        indent = indent+1, verbosity = verbosity
-    )
-    search_pattern.improve_grid(verbosity = 0)
-    print_message(
-        'Done\n',
-        3,
-        indent = indent+1, verbosity = verbosity
-    )
+
     if force_evolution:
         # The most important bit. Enforces the evolution rules
         search_pattern.force_evolution(method=method, indent = indent + 1, verbosity = verbosity)
