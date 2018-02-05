@@ -403,7 +403,7 @@ class SearchPattern:
 
     def force_at_most(self, literals, at_most, indent = 0, verbosity = 0):
         """Adds clauses forcing at least at_least of literals to be true"""
-        
+
         self.force_at_least(map(negate, literals), len(literals) - at_most, indent = indent, verbosity = verbosity)
 
     def force_symmetry(self, symmetry, indent = 0, verbosity = 0):
@@ -564,9 +564,6 @@ class SearchPattern:
         print_message('Formatting output...', 3, indent = indent, verbosity = verbosity)
 
         assert pattern_output_format in ["rle","csv"], "Format not recognised"
-
-        if not determined:
-            print_message('(Including all generations)', 3, indent = indent, verbosity = verbosity)
 
         if pattern_output_format == "rle":
             output_string = LLS_formatting.make_rle(self.grid, rule = self.rule, determined = determined, indent = indent + 1, verbosity = verbosity)

@@ -299,6 +299,15 @@ def preprocess(
 
     search_pattern.remove_redundancies(indent = indent + 1, verbosity = verbosity)
 
+    print_message(
+        "Search grid:\n",
+        3,
+        indent = indent + 1, verbosity = verbosity)
+    print_message(
+        search_pattern.make_string(pattern_output_format = "csv"),
+        3,
+        indent = indent + 2, verbosity = verbosity)
+
     #Constraints that are enforced by clauses
     if force_nonempty:
         search_pattern.force_nonempty(indent = indent + 1, verbosity = verbosity)
