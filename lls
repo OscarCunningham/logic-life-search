@@ -48,14 +48,14 @@ parser.add_argument(
     nargs = "*",
     action = "append",
     default = [],
-    help = """Impose a symmetry on the pattern"""
+    help = """Impose a symmetry on the pattern Examples: "D4x" enforces reflection symmetry about both axes, "p7" enforces period 7, "p2 RE\ x1" imposes the glide-reflect symmetry of a glider."""
 )
 parser.add_argument(
     '-a', '--asymmetry',
     nargs = "*",
     action = "append",
     default = [],
-    help = """Impose an asymmetry on the pattern"""
+    help = """Impose an asymmetry on the pattern."""
 )
 parser.add_argument(
     '-c', '--force_change',
@@ -71,7 +71,7 @@ parser.add_argument(
     nargs = "*",
     default = [],
     metavar = ("constraint", "GEN_0"),
-    help = "Imposes a constraint on the population"
+    help = """"Imposes a constraint on the population. Examples: "<10", ">=20", "=15". The population is measured in the first generation by default, or otherwise summed over all generations mentioned.""""
 )
 parser.add_argument(
     '-o', '--output_file_name',
@@ -162,14 +162,14 @@ parser.add_argument(
     '--background', "--bg",
     nargs = 1,
     default = None,
-    help = """Specify a background"""
+    help = """Specify a background, default is vacuum"""
 )
 parser.add_argument(
     '--background_offset', "--bgos",
     nargs = 3,
     type = int,
     default = None,
-    help = """Specify a background"""
+    help = """Specify a background offset"""
 )
 args = parser.parse_args()
 
