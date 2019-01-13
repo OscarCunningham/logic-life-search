@@ -278,28 +278,16 @@ def transition_from_cells(cell_0,
     if all(isinstance(cell, bool) for cell in cells):
         cells = ["1" if cell else "0" for cell in cells]
 
-    cell_string = "".join(sort_neighbours(cells, totalistic = False))
+    cell_string = "".join(sort_neighbours(cells))
 
     return transition_lookup[cell_string]
 
-def outer_totalistic(rule):
-
-    totalistic = True
-    for number_of_neighbours in "012345678":
-        for BS_letter in ["B", "S"]:
-            if len(set(rule[BS_letter + number_of_neighbours + transition_character] for transition_character in possible_transitions[number_of_neighbours])) > 1:
-                totalistic = False
-    return totalistic
-
-def sort_neighbours(neighbours, totalistic = False):
-    if totalistic:
-        return sorted(neighbours)
-    else:
-        return max((neighbours[0], neighbours[1], neighbours[2], neighbours[3], neighbours[4], neighbours[5], neighbours[6], neighbours[7]),
-                   (neighbours[6], neighbours[7], neighbours[0], neighbours[1], neighbours[2], neighbours[3], neighbours[4], neighbours[5]),
-                   (neighbours[4], neighbours[5], neighbours[6], neighbours[7], neighbours[0], neighbours[1], neighbours[2], neighbours[3]),
-                   (neighbours[2], neighbours[3], neighbours[4], neighbours[5], neighbours[6], neighbours[7], neighbours[0], neighbours[1]),
-                   (neighbours[6], neighbours[5], neighbours[4], neighbours[3], neighbours[2], neighbours[1], neighbours[0], neighbours[7]),
-                   (neighbours[0], neighbours[7], neighbours[6], neighbours[5], neighbours[4], neighbours[3], neighbours[2], neighbours[1]),
-                   (neighbours[2], neighbours[1], neighbours[0], neighbours[7], neighbours[6], neighbours[5], neighbours[4], neighbours[3]),
-                   (neighbours[4], neighbours[3], neighbours[2], neighbours[1], neighbours[0], neighbours[7], neighbours[6], neighbours[5]))
+def sort_neighbours(neighbours):
+    return max((neighbours[0], neighbours[1], neighbours[2], neighbours[3], neighbours[4], neighbours[5], neighbours[6], neighbours[7]),
+               (neighbours[6], neighbours[7], neighbours[0], neighbours[1], neighbours[2], neighbours[3], neighbours[4], neighbours[5]),
+               (neighbours[4], neighbours[5], neighbours[6], neighbours[7], neighbours[0], neighbours[1], neighbours[2], neighbours[3]),
+               (neighbours[2], neighbours[3], neighbours[4], neighbours[5], neighbours[6], neighbours[7], neighbours[0], neighbours[1]),
+               (neighbours[6], neighbours[5], neighbours[4], neighbours[3], neighbours[2], neighbours[1], neighbours[0], neighbours[7]),
+               (neighbours[0], neighbours[7], neighbours[6], neighbours[5], neighbours[4], neighbours[3], neighbours[2], neighbours[1]),
+               (neighbours[2], neighbours[1], neighbours[0], neighbours[7], neighbours[6], neighbours[5], neighbours[4], neighbours[3]),
+               (neighbours[4], neighbours[3], neighbours[2], neighbours[1], neighbours[0], neighbours[7], neighbours[6], neighbours[5]))

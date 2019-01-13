@@ -11,6 +11,7 @@ import src.LLS_search_patterns
 import src.LLS_rules
 import src.LLS_files
 import src.LLS_defaults
+import src.LLS_literal_manipulation
 from src.SearchPattern import SearchPattern
 from src.LLS_literal_manipulation import negate, variable_from_literal
 from src.LLS_messages import print_message
@@ -43,50 +44,34 @@ parser.add_argument(
     help = '''Creates a search pattern for the stator of the oscillator in the given file'''
 )
 parser.add_argument(
-    '-a', '--agar_crawler_search_pattern',
-    nargs = "+",
-    type = int,
-    metavar = ("BOUNDS"),
-    default = None,
-    help = """Creates a search patter with size BOUND_1 by BOUND_2 in the zebra-stripes agar. Duration is period + 1."""
-)
-parser.add_argument(
-    '--agar_offset',
-    action = "store_true",
-    help = 'Forces the stripes in the zebra agar to be black and white rather than white and black'
-)
-parser.add_argument(
     '-s', '--symmetry',
-    default = "C1",
-    help = """Impose a symmetry on the pattern, valid inputs are: "C1" - no symmetry (default), "C2" - 180 degree rotational symmetry, "C4" -  90 degree rotational symmetry, "D2-", "D2/", "D2|", "D2\\" - reflection symmetry about given axis, "D4+", "D4X" - reflection symmetry about given axes, "D8" - reflection symmetry about all axes"""
+    nargs = "*",
+    action = "append",
+    default = [],
+    help = """Impose a symmetry on the pattern"""
 )
 parser.add_argument(
-    '-p', '--period',
+    '-a', '--asymmetry',
+    nargs = "*",
+    action = "append",
+    default = [],
+    help = """Impose an asymmetry on the pattern"""
+)
+parser.add_argument(
+    '-c', '--force_change',
+    nargs = "*",
+    action = "append",
     type = int,
-    default = None,
-    help = 'Forces the pattern to have period PERIOD'
+    default = [],
+    help = 'Forces the first two generations to be different, or the two given generations to be different'
 )
 parser.add_argument(
-    '-x', '--x_translate',
-    type = int,
-    default = None,
-    help = 'Used with --period, means that the pattern will be translated that far each period'
-)
-parser.add_argument(
-    '-y', '--y_translate',
-    type = int,
-    default = None,
-    help = 'Used with --period, means that the pattern will be translated that far each period'
-)
-parser.add_argument(
-    '-i', '--force_nonempty', '--force_inhabited',
-    action = "store_true",
-    help = 'Forces the first generation to have at least one live cell'
-)
-parser.add_argument(
-    '-m', '--force_movement',
-    action = "store_true",
-    help = 'Forces the first two generations to be different'
+    "-p", "--population", "--pop",
+    action = 'append',
+    nargs = "*",
+    default = [],
+    metavar = ("constraint", "GEN_0"),
+    help = "Imposes a constraint on the population"
 )
 parser.add_argument(
     '-o', '--output_file_name',
@@ -127,33 +112,6 @@ parser.add_argument(
     type = int,
     default = src.LLS_defaults.verbosity,
     help = """Set the verbosity. Options: 0 - No output. Only useful with -o option to save solution to file. 1 - Only display the solution. 2 (Default) - Displays some information about what the program is doing, some statistics, and the solution. 3 - A huge torrent of information."""
-)
-parser.add_argument(
-    "-c", "--force_change",
-    action = 'append',
-    nargs = 2,
-    type = int,
-    default = [],
-    metavar = ("GEN_0", "GEN_1"),
-    help = "Forces there to be at least one cell difference between the specified generations"
-)
-parser.add_argument(
-    "--force_at_least",
-    action = 'append',
-    nargs = "+",
-    type = int,
-    default = [],
-    metavar = ("AMOUNT", "GEN_0"),
-    help = "Forces there to be at least AMOUNT live cells in the first generation or in the specified generations combined"
-)
-parser.add_argument(
-    "--force_at_most",
-    action = 'append',
-    nargs = "+",
-    type = int,
-    default = [],
-    metavar = ("AMOUNT", "GEN_0"),
-    help = "Forces there to be at most AMOUNT live cells in the first generation or in the specified generations combined"
 )
 parser.add_argument(
     "-n", "--number_of_solutions",
@@ -200,6 +158,19 @@ parser.add_argument(
     default = None,
     help = """Which rule to use. Rules can also be specified as partial rules, by adding a "p" to the front. For example "pB3a-c/S23" allows any of the transitions from Life, except 3a must be present and 3c must not. Can also specify rule as a Python dictionary, like so: {'S4e': '0', 'S4a': '0', 'S4c': '0', 'S4n': '0', 'S4i': '0', 'S4j': '0', 'S4k': '0', 'S4t': '0', 'S4w': '0', 'S4q': '0', 'S4r': '0', 'S4y': '0', 'S4z': '0', 'B2n': '0', 'B2k': '0', 'B2i': '0', 'B2e': '0', 'B2c': '0', 'B2a': '0', 'S5e': '0', 'S5c': '0', 'S5a': '0', 'S5n': '0', 'S5k': '0', 'S5j': '0', 'S5i': '0', 'S5r': '0', 'S5q': '0', 'S5y': '0', 'B5y': '0', 'B5r': '0', 'B5q': '0', 'B5j': '0', 'B5k': '0', 'B5i': '0', 'B5n': '0', 'B5c': '0', 'B5a': '0', 'B5e': '0', 'S6n': '0', 'B0c': '0', 'S6k': '0', 'S6i': '0', 'S6e': '0', 'S6c': '0', 'S6a': '0', 'B8c': '0', 'S7c': '0', 'S7e': '0', 'B3y': 'r_7', 'B3q': 'r_5', 'B3r': 'r_6', 'B3n': 'r_4', 'B3i': 'r_1', 'B3j': 'r_2', 'B3k': 'r_3', 'B3e': 'r_0', 'B3a': '1', 'B3c': '0', 'S8c': '0', 'B6c': '0', 'B6a': '0', 'B6e': '0', 'B6k': '0', 'B6i': '0', 'S0c': '0', 'B6n': '0', 'B1e': '0', 'B1c': '0', 'S1c': '0', 'S1e': '0', 'S2c': 'r_9', 'S2a': 'r_8', 'S2e': 'r_10', 'S2k': 'r_12', 'S2i': 'r_11', 'S2n': 'r_13', 'B4t': '0', 'B4w': '0', 'B4q': '0', 'B4r': '0', 'B4y': '0', 'B4z': '0', 'B4e': '0', 'S3n': 'r_20', 'B4a': '0', 'B4c': '0', 'B4n': '0', 'B4i': '0', 'B4k': '0', 'B4j': '0', 'S3y': 'r_23', 'S3q': 'r_21', 'S3r': 'r_22', 'B7c': '0', 'S3i': 'r_17', 'B7e': '0', 'S3k': 'r_19', 'S3j': 'r_18', 'S3e': 'r_16', 'S3a': 'r_14', 'S3c': 'r_15'}"""
 )
+parser.add_argument(
+    '--background', "--bg",
+    nargs = 1,
+    default = None,
+    help = """Specify a background"""
+)
+parser.add_argument(
+    '--background_offset', "--bgos",
+    nargs = 3,
+    type = int,
+    default = None,
+    help = """Specify a background"""
+)
 args = parser.parse_args()
 
 indent = 0
@@ -217,6 +188,8 @@ if args.substitute_solution:
     (
         grid,
         ignore_transition,
+        background_grid,
+        background_ignore_transition,
         rule,
         DIMACS_literal_from_variable
     ) = src.LLS_files.object_from_file(
@@ -228,7 +201,10 @@ if args.substitute_solution:
     search_pattern = SearchPattern(
         grid,
         ignore_transition = ignore_transition,
+        background_grid = background_grid,
+        background_ignore_transition = background_ignore_transition,
         rule = rule,
+        add_border = False,
         indent = indent, verbosity = verbosity
     )
     search_pattern.clauses.DIMACS_literal_from_variable = DIMACS_literal_from_variable
@@ -250,10 +226,102 @@ if args.substitute_solution:
 else:
     print_message('Getting search pattern...', indent = indent, verbosity = verbosity)
 
+    force_change = []
+    for generations in args.force_change:
+        assert len(generations) in [0, 2], "Wrong number of arguments to -c"
+        if len(generations) == 0:
+            force_change.append([0,1])
+        elif len(generations) == 2:
+            force_change.append(generations)
+
+    population_at_most = []
+    population_at_least = []
+    population_exactly = []
+    for arguments in args.population:
+        if len(arguments) == 0:
+            population_at_least.append([[0],1])
+        else:
+            constraint = arguments[0]
+            times = [int(t) for t in arguments[1:]] if len(arguments) > 1 else [0]
+            re_match = re.match("(^.*?)([0-9]*$)", constraint)
+            sign = re_match.group(1)
+            amount = int(re_match.group(2))
+            if sign in ["", "="]:
+                population_exactly.append([times, amount])
+            elif sign in ["<=","=<"]:
+                population_at_most.append([times, amount])
+            elif sign in [">=","=>"]:
+                population_at_least.append([times, amount])
+            elif sign == "<":
+                population_at_most.append([times, amount - 1])
+            elif sign == ">":
+                population_at_least.append([times, amount + 1])
+
+    symmetries = []
+    asymmetries = []
+    max_period = 0
+    for symmetry_list, argument_list in [(symmetries, args.symmetry), (asymmetries, args.asymmetry)]:
+        for arguments in argument_list:
+            transformations = []
+            period = None
+            x_translate = None
+            y_translate = None
+            for argument in arguments:
+                re_match = re.match("(^.*?)([0-9]*$)", argument)
+                letters = re_match.group(1).upper()
+                number = re_match.group(2)
+                if letters == "P":
+                    assert period == None, "Can only have one period at a time"
+                    period = int(number)
+                    max_period = max(max_period, period)
+                elif letters == "X":
+                    assert x_translate == None, "Can only have one x_translate at a time"
+                    x_translate = int(number)
+                elif letters == "Y":
+                    assert y_translate == None, "Can only have one y_translate at a time"
+                    y_translate = int(number)
+                else:
+                    assert transformations == [], "Can only impose one symmetry at a time"
+                    transformation = letters + str(number)
+                    if letters == "RO":
+                        transformations.append(letters + str(int(number) % 4))
+                    elif transformation == "C1":
+                        transformations.append("RO0")
+                    elif transformation == "C2":
+                        transformations.append("ro2")
+                    elif transformation == "C4":
+                        transformations.append("ro1")
+                    elif transformation == "D2-":
+                        transformations.append("re-")
+                    elif transformation == "D2\\":
+                        transformations.append("re\\")
+                    elif transformation == "D2|":
+                        transformations.append("re|")
+                    elif transformation == "D2/":
+                        transformations.append("re/")
+                    elif transformation == "D4+":
+                        transformations += ["re-","re|"]
+                    elif transformation == "D4X":
+                        transformations += ["re/","re\\"]
+                    elif transformation == "D8":
+                        transformations += ["re-","re\\"]
+                    else:
+                        assert transformation in ["RE-","RE/","RE|","RE\\"], 'Symmetry argument "' + transformation + '" not recognized'
+                        transformations.append(transformation)
+            if transformations == []:
+                transformations = ["RO0"]
+            if period == None:
+                period = 0
+            if x_translate == None:
+                x_translate = 0
+            if y_translate == None:
+                y_translate = 0
+            for transformation in transformations:
+                symmetry_list.append([transformation, x_translate, y_translate, period])
+
     number_of_search_patterns = sum(map(bool, [
         args.input_file_name,
         args.blank_search_pattern,
-        args.agar_crawler_search_pattern,
         args.check_orphan,
         args.stator
     ]))
@@ -269,6 +337,45 @@ else:
                 variable, negated = variable_from_literal(literal)
                 literal = negate("user_input_" + variable, negated)
                 rule[transition] = literal
+
+    if args.background:
+        #Check current directory and then backgrounds/
+        print_message(
+            'Creating background from file "' + args.background[0] + '" ...',
+            3,
+            indent = indent + 1, verbosity = verbosity
+        )
+        if os.path.isfile(args.background[0]):
+            input_string = src.LLS_files.string_from_file(
+                args.background[0],
+                indent = indent + 2, verbosity = verbosity
+            )
+        elif os.path.isfile("backgrounds/" + args.background[0]):
+            input_string = src.LLS_files.string_from_file(
+                "backgrounds/" + args.background[0],
+                indent = indent + 2, verbosity = verbosity
+            )
+        else:
+            assert False, "Search pattern file not found"
+        background_grid, background_ignore_transition = src.LLS_search_patterns.search_pattern_from_string(
+            input_string,
+            indent = indent + 2, verbosity = verbosity
+        )
+        print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
+    else:
+        (
+            background_grid,
+            background_ignore_transition
+        ) = src.LLS_search_patterns.search_pattern_from_string(
+            src.LLS_files.string_from_file(
+                "backgrounds/" + src.LLS_defaults.background,
+            )
+        )
+
+    if args.background_offset:
+        src.LLS_literal_manipulation.offset_background(background_grid, *args.background_offset)
+        src.LLS_literal_manipulation.offset_background(background_ignore_transition, *args.background_offset)
+
 
     if args.input_file_name:
         #Check current directory and then search_pattern/
@@ -300,43 +407,16 @@ else:
         if len(args.blank_search_pattern) == 1:
             width = args.blank_search_pattern[0]
             height = args.blank_search_pattern[0]
-            duration = (args.period + 1) if (args.period != None) else 2
+            duration = max_period + 1
         elif len(args.blank_search_pattern) == 2:
             width = args.blank_search_pattern[0]
             height = args.blank_search_pattern[1]
-            duration = (args.period + 1) if (args.period != None) else 2
+            duration = max_period + 1
         elif len(args.blank_search_pattern) == 3:
             width = args.blank_search_pattern[0]
             height = args.blank_search_pattern[1]
             duration = args.blank_search_pattern[2]
         grid = src.LLS_search_patterns.blank_search_pattern(width, height, duration, indent = indent + 1, verbosity = verbosity)
-
-    if args.agar_crawler_search_pattern:
-        assert len(args.agar_crawler_search_pattern) in range(1, 3), "Wrong number of arguments for bounding box"
-        if args.x_translate == None:
-            args.x_translate = 0
-        if args.y_translate == None:
-            args.y_translate = 0
-        if args.period == None:
-            args.period = 0
-        if len(args.agar_crawler_search_pattern) == 1:
-            width = args.agar_crawler_search_pattern[0]
-            height = args.agar_crawler_search_pattern[0]
-        elif len(args.agar_crawler_search_pattern) == 2:
-            width = args.agar_crawler_search_pattern[0]
-            height = args.agar_crawler_search_pattern[1]
-        grid, ignore_transition = src.LLS_search_patterns.crawler_search_pattern(
-            width,
-            height,
-            args.x_translate,
-            args.y_translate,
-            args.period,
-            args.agar_offset,
-            indent = indent + 1, verbosity = verbosity
-        )
-        args.x_translate = None
-        args.y_translate = None
-        args.period = None
 
     if args.check_orphan:
         if os.path.isfile(args.check_orphan[0]):
@@ -364,7 +444,7 @@ else:
                 indent = indent + 1, verbosity = verbosity
             ),
         indent = indent + 1, verbosity = verbosity)
-        grid = src.LLS_search_patterns.stator_search_pattern(grid[0], rule, indent = indent + 1, verbosity = verbosity)
+        grid = src.LLS_search_patterns.stator_search_pattern(grid[0], rule, background_grid, indent = indent + 1, verbosity = verbosity)
 
     if number_of_search_patterns == 0:
         print_message(
@@ -380,10 +460,13 @@ else:
     search_pattern = SearchPattern(
         grid,
         ignore_transition = ignore_transition,
+        background_grid = background_grid,
+        background_ignore_transition = background_ignore_transition,
         rule = rule,
         indent = indent + 1, verbosity = verbosity
     )
-    search_pattern.standardise_varaibles_names(indent = indent + 1, verbosity = verbosity)
+
+
 
     print_message('Done\n', indent = indent, verbosity = verbosity)
 
@@ -391,22 +474,19 @@ else:
     # LLS_main.LLS does all the hard work
     src.LLS_main.LLS(
         search_pattern,
-        symmetry = args.symmetry,
-        period = args.period,
-        x_translate = args.x_translate,
-        y_translate = args.y_translate,
-        force_movement = args.force_movement,
+        symmetries = symmetries,
+        asymmetries = asymmetries,
+        population_at_most = population_at_most,
+        population_at_least = population_at_least,
+        population_exactly = population_exactly,
+        force_change = force_change,
+        force_evolution = True,
         solver = args.solver,
         parameters = args.parameters,
         timeout = args.timeout,
         save_dimacs = args.save_dimacs,
         save_state = args.save_state,
         method = args.method,
-        force_at_most = args.force_at_most,
-        force_at_least = args.force_at_least,
-        force_change = args.force_change,
-        force_nonempty = args.force_nonempty,
-        force_evolution = True,
         dry_run = args.dry_run,
         number_of_solutions = args.number_of_solutions,
         pattern_output_format = pattern_output_format,

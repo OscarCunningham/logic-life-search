@@ -5,6 +5,8 @@ import LLS_taocp_variable_scheme
 import LLS_formatting
 import LLS_rules
 import LLS_defaults
+import LLS_files
+import LLS_literal_manipulation
 from ClauseList import ClauseList
 from UnsatInPreprocessing import UnsatInPreprocessing
 from LLS_messages import print_message
@@ -13,26 +15,87 @@ from LLS_literal_manipulation import negate, variable_from_literal, neighbours_f
 class SearchPattern:
 
 
-    def __init__(self, grid, ignore_transition = None, rule = None, indent = 0, verbosity = 0):
+    def __init__(
+        self,
+        grid,
+        ignore_transition = None,
+        background_grid = None,
+        background_ignore_transition = None,
+        rule = None,
+        add_border = True,
+        indent = 0, verbosity = 0
+    ):
         self.grid = copy.deepcopy(grid)
-        self.ignore_transition = (copy.deepcopy(ignore_transition)
-                                  if (ignore_transition != None)
-                                  else [[[False
-                                  for cell in row] for row in generation] for generation in grid])
+        self.ignore_transition = (
+            copy.deepcopy(ignore_transition)
+            if (ignore_transition != None)
+            else [[[False for cell in row] for row in generation] for generation in grid]
+        )
+        if background_grid == None:
+            (
+                self.background_grid,
+                self.background_ignore_transition
+            ) = LLS_formatting.parse_input_string(
+                LLS_files.string_from_file(
+                    "backgrounds/" + LLS_defaults.background,
+                )
+            )
+        else:
+            self.background_grid = copy.deepcopy(background_grid)
+            self.background_ignore_transition = (
+                copy.deepcopy(background_ignore_transition)
+                if (background_ignore_transition != None)
+                else [[[False for cell in row] for row in generation] for generation in background_grid]
+            )
         self.clauses = ClauseList()
         self.rule = (copy.deepcopy(rule)
                                   if (rule != None)
                                   else LLS_rules.rule_from_rulestring(LLS_defaults.rulestring))
-        assert len(self.grid) == len(self.ignore_transition), "Durations of grid and ignore_transition don't match"
-        assert len(self.grid[0]) == len(self.ignore_transition[0]), "Heights of grid and ignore_transition don't match"
-        assert len(self.grid[0][0]) == len(self.ignore_transition[0][0]), "Widths of grid and ignore_transition don't match"
+
+        if add_border:
+            width = len(self.grid[0][0])
+            height = len(self.grid[0])
+            duration = len(self.grid)
+            background_width = len(self.background_grid[0][0])
+            background_height = len(self.background_grid[0])
+            background_duration = len(self.background_grid)
+
+            # Surround the grid by one cell from the background, and offset the background accodingly
+            LLS_literal_manipulation.offset_background(self.background_grid,1,1,0)
+            new_grid = [[["0" for x in xrange(width + 2)] for y in xrange(height + 2)] for t in xrange(duration)]
+            for x in xrange(width + 2):
+                for y in xrange(height + 2):
+                    for t in xrange(duration):
+                        if x in range(1, width + 1) and y in range(1, height + 1):
+                            new_grid[t][y][x] = self.grid[t][y - 1][x - 1]
+                        else:
+                            new_grid[t][y][x] = self.background_grid[t % background_duration][y % background_height][x % background_width]
+            self.grid = new_grid
+            LLS_literal_manipulation.offset_background(self.background_ignore_transition,1,1,0)
+            new_ignore_transition = [[["0" for x in xrange(width + 2)] for y in xrange(height + 2)] for t in xrange(duration)]
+            for x in xrange(width + 2):
+                for y in xrange(height + 2):
+                    for t in xrange(duration):
+                        if x in range(1, width + 1) and y in range(1, height + 1):
+                            new_ignore_transition[t][y][x] = self.ignore_transition[t][y - 1][x - 1]
+                        else:
+                            new_ignore_transition[t][y][x] = self.background_ignore_transition[t % background_duration][y % background_height][x % background_width]
+            self.ignore_transition = new_ignore_transition
+
 
 
     def __eq__(self, other):
         if other == None:
             return False
         else:
-            return (self.grid == other.grid and self.ignore_transition == other.ignore_transition and self.clauses == other.clauses and self.rule == other.rule)
+            return (
+                self.grid == other.grid
+                and self.ignore_transition == other.ignore_transition
+                and self.background_grid == other.background_grid
+                and self.background_ignore_transition == other.ignore_transition
+                and self.clauses == other.clauses
+                and self.rule == other.rule
+            )
 
 
     def __ne__(self, other):
@@ -46,6 +109,18 @@ class SearchPattern:
         standard_variables_from_input_variables = {}
         current_variable_number = 0
 
+        for t, generation in enumerate(self.background_grid):
+            for y, row in enumerate(generation):
+                for x, cell in enumerate(row):
+                    if cell == "*":
+                        self.background_grid[t][y][x] = "c" + str(current_variable_number)
+                        current_variable_number += 1
+                    elif cell not in ["0","1"]:
+                        (variable, negated) = variable_from_literal(cell)
+                        if not standard_variables_from_input_variables.has_key(variable):
+                            standard_variables_from_input_variables[variable] = negate("c" + str(current_variable_number),negated)
+                            current_variable_number += 1
+                        self.background_grid[t][y][x] = negate(standard_variables_from_input_variables[variable],negated)
         for t, generation in enumerate(self.grid):
             for y, row in enumerate(generation):
                 for x, cell in enumerate(row):
@@ -76,16 +151,41 @@ class SearchPattern:
         print_message("Removing redundant transitions...", 3, indent = indent, verbosity = verbosity)
         parents_dict = {}
         to_force_equal = []
-        outer_totalistic = LLS_rules.outer_totalistic(self.rule)
+        background_duration = len(self.background_grid)
+        for t, generation in enumerate(self.background_grid):
+            for y, row in enumerate(generation):
+                for x, cell in enumerate(row):
+                    predecessor_cell = self.background_grid[(t - 1) % background_duration][y][x]
+                    neighbours = neighbours_from_coordinates(self.background_grid, x, y, t, background_grid = self.background_grid)
+                    if not self.background_ignore_transition[t][y][x]:
+                        parents = [predecessor_cell] + list(LLS_rules.sort_neighbours(neighbours))
+                        parents_string = str(parents)
+                        if parents_dict.has_key(parents_string):
+                            self.background_grid[t][y][x] = parents_dict[parents_string]
+                            to_force_equal.append((parents_dict[parents_string],cell))
+                            self.background_ignore_transition[t][y][x] = True
+                        elif all(parent in ["0", "1"] for parent in parents):
+                            BS_letter = ["B", "S"][["0", "1"].index(predecessor_cell)]
+                            transition = LLS_rules.transition_from_cells(neighbours)
+                            child = self.rule[BS_letter + transition]
+                            if cell not in ["0","1"]:
+                                self.background_grid[t][y][x] = child
+                            to_force_equal.append((cell, child))
+                            self.background_ignore_transition[t][y][x] = True
+                            parents_dict[parents_string] = self.background_grid[t][y][x]
+                        else:
+                            parents_dict[parents_string] = cell
+        self.force_equal(to_force_equal)
+        to_force_equal = []
         for t, generation in enumerate(self.grid):
             if t > 0:
                 for y, row in enumerate(generation):
                     for x, cell in enumerate(row):
                         predecessor_cell = self.grid[t - 1][y][x]
-                        neighbours = neighbours_from_coordinates(self.grid, x, y, t)
+                        neighbours = neighbours_from_coordinates(self.grid, x, y, t, background_grid = self.background_grid)
 
                         if not self.ignore_transition[t][y][x]:
-                            parents = [predecessor_cell] + list(LLS_rules.sort_neighbours(neighbours, outer_totalistic))
+                            parents = [predecessor_cell] + list(LLS_rules.sort_neighbours(neighbours))
                             parents_string = str(parents)
                             if parents_dict.has_key(parents_string):
                                 self.grid[t][y][x] = parents_dict[parents_string]
@@ -95,15 +195,81 @@ class SearchPattern:
                                 BS_letter = ["B", "S"][["0", "1"].index(predecessor_cell)]
                                 transition = LLS_rules.transition_from_cells(neighbours)
                                 child = self.rule[BS_letter + transition]
-                                self.grid[t][y][x] = child
+                                if cell not in ["0","1"]:
+                                    self.grid[t][y][x] = child
                                 to_force_equal.append((cell, child))
                                 self.ignore_transition[t][y][x] = True
-                                parents_dict[parents_string] = child
+                                parents_dict[parents_string] = self.grid[t][y][x]
                             else:
                                 parents_dict[parents_string] = cell
         self.force_equal(to_force_equal)
         print_message("Done\n", 3, indent = indent, verbosity = verbosity)
 
+    def force_transition(self, grid, x, y, t, method):
+        cell = grid[t][y][x]
+        duration = len(grid)
+        if method == 0:
+            LLS_taocp_variable_scheme.transition_rule(self, grid, x, y, t)
+
+        elif method == 1:
+            predecessor_cell = grid[(t - 1) % duration][y][x]
+            neighbours = neighbours_from_coordinates(grid, x, y, t, background_grid = self.background_grid)
+
+            # If any four neighbours were live, then the cell is
+            # dead
+            for four_neighbours in itertools.combinations(neighbours, 4):
+                clause = implies(four_neighbours, negate(cell))
+                self.clauses.append(clause)
+
+            # If any seven neighbours were dead, the cell is dead
+            for seven_neighbours in itertools.combinations(neighbours, 7):
+                clause = implies(map(negate,seven_neighbours), negate(cell))
+                self.clauses.append(clause)
+
+            # If the cell was dead, and any six neighbours were
+            # dead, the cell is dead
+            for six_neighbours in itertools.combinations(neighbours, 6):
+                clause = implies([negate(predecessor_cell)] + map(negate,six_neighbours), negate(cell))
+                self.clauses.append(clause)
+
+            # If three neighbours were alive and five were dead,
+            # then the cell is live
+            for three_neighbours in itertools.combinations(neighbours, 3):
+                neighbours_counter = collections.Counter(neighbours)
+                neighbours_counter.subtract(three_neighbours)
+                three_neighbours, five_neighbours = list(three_neighbours), list(neighbours_counter.elements())
+
+                clause = implies(three_neighbours + map(negate, five_neighbours), cell)
+                self.clauses.append(clause)
+
+            # Finally, if the cell was live, and two neighbours
+            # were live, and five neighbours were dead, then the
+            # cell is live (independantly of the final neighbour)
+            for two_neighbours in itertools.combinations(neighbours, 2):
+                neighbours_counter = collections.Counter(neighbours)
+                neighbours_counter.subtract(two_neighbours)
+                two_neighbours, five_neighbours = list(two_neighbours), list(neighbours_counter.elements())[1:]
+
+                clause = implies([predecessor_cell] + two_neighbours + map(negate, five_neighbours), cell)
+                self.clauses.append(clause)
+
+        elif method == 2:
+
+            predecessor_cell = grid[(t - 1) % duration][y][x]
+            neighbours = neighbours_from_coordinates(self.grid,x,y,t, background_grid = self.background_grid)
+
+            booleans = [True, False]
+
+            # For each combination of neighbourhoods
+            for predecessor_cell_alive in booleans:
+                for neighbours_alive in itertools.product(booleans,repeat=8):
+
+                    BS_letter = "S" if predecessor_cell_alive else "B"
+                    transition = LLS_rules.transition_from_cells(neighbours_alive)
+                    transition_literal = self.rule[BS_letter + transition]
+
+                    self.clauses.append(implies([transition_literal] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), cell))
+                    self.clauses.append(implies([negate(transition_literal)] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), negate(cell)))
 
     def force_evolution(self, method=None, indent = 0, verbosity = 0):
         """Adds clauses that force the search pattern to obey the transition rule"""
@@ -131,69 +297,14 @@ class SearchPattern:
                 for y, row in enumerate(generation):
                     for x, cell in enumerate(row):
                         if not self.ignore_transition[t][y][x]:
+                            self.force_transition(self.grid, x,y,t, method)
 
-                            if method == 0:
-                                LLS_taocp_variable_scheme.transition_rule(self, x, y, t)
-
-                            elif method == 1:
-                                predecessor_cell = self.grid[t - 1][y][x]
-                                neighbours = neighbours_from_coordinates(self.grid, x, y, t)
-
-                                # If any four neighbours were live, then the cell is
-                                # dead
-                                for four_neighbours in itertools.combinations(neighbours, 4):
-                                    clause = implies(four_neighbours, negate(cell))
-                                    self.clauses.append(clause)
-
-                                # If any seven neighbours were dead, the cell is dead
-                                for seven_neighbours in itertools.combinations(neighbours, 7):
-                                    clause = implies(map(negate,seven_neighbours), negate(cell))
-                                    self.clauses.append(clause)
-
-                                # If the cell was dead, and any six neighbours were
-                                # dead, the cell is dead
-                                for six_neighbours in itertools.combinations(neighbours, 6):
-                                    clause = implies([negate(predecessor_cell)] + map(negate,six_neighbours), negate(cell))
-                                    self.clauses.append(clause)
-
-                                # If three neighbours were alive and five were dead,
-                                # then the cell is live
-                                for three_neighbours in itertools.combinations(neighbours, 3):
-                                    neighbours_counter = collections.Counter(neighbours)
-                                    neighbours_counter.subtract(three_neighbours)
-                                    three_neighbours, five_neighbours = list(three_neighbours), list(neighbours_counter.elements())
-
-                                    clause = implies(three_neighbours + map(negate, five_neighbours), cell)
-                                    self.clauses.append(clause)
-
-                                # Finally, if the cell was live, and two neighbours
-                                # were live, and five neighbours were dead, then the
-                                # cell is live (independantly of the final neighbour)
-                                for two_neighbours in itertools.combinations(neighbours, 2):
-                                    neighbours_counter = collections.Counter(neighbours)
-                                    neighbours_counter.subtract(two_neighbours)
-                                    two_neighbours, five_neighbours = list(two_neighbours), list(neighbours_counter.elements())[1:]
-
-                                    clause = implies([predecessor_cell] + two_neighbours + map(negate, five_neighbours), cell)
-                                    self.clauses.append(clause)
-
-                            elif method == 2:
-
-                                predecessor_cell = self.grid[t - 1][y][x]
-                                neighbours = neighbours_from_coordinates(self.grid,x,y,t)
-
-                                booleans = [True, False]
-
-                                # For each combination of neighbourhoods
-                                for predecessor_cell_alive in booleans:
-                                    for neighbours_alive in itertools.product(booleans,repeat=8):
-
-                                        BS_letter = "S" if predecessor_cell_alive else "B"
-                                        transition = LLS_rules.transition_from_cells(neighbours_alive)
-                                        transition_literal = self.rule[BS_letter + transition]
-
-                                        self.clauses.append(implies([transition_literal] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), cell))
-                                        self.clauses.append(implies([negate(transition_literal)] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), negate(cell)))
+        # Iterate over all background cells
+        for t, generation in enumerate(self.background_grid):
+            for y, row in enumerate(generation):
+                for x, cell in enumerate(row):
+                    if not self.background_ignore_transition[t][y][x]:
+                        self.force_transition(self.background_grid, x,y,t, method)
 
         print_message(
             "Number of clauses used: " + str(len(self.clauses.clause_set) - starting_number_of_clauses),
@@ -202,56 +313,26 @@ class SearchPattern:
         )
         print_message("Done\n", 3, indent = indent, verbosity = verbosity)
 
-    def force_nonempty(self, indent = 0, verbosity = 0):
-        """Adds clauses forcing at least one cell to be live in first generation"""
 
-        print_message("Forcing at least one cell to be live in first generation...", 3, indent = indent, verbosity = verbosity)
-
-        self.clauses.append([cell for row in self.grid[0] for cell in row])
-        print_message("Number of clauses used: 1", 3, indent = indent + 1, verbosity = verbosity)
-        print_message("Done\n", 3, indent = indent, verbosity = verbosity)
-
-
-
-    def force_movement(self, indent = 0, verbosity = 0):
-        """Adds clauses forcing at least one cell to change between first two generations"""
-
-        self.force_change(0, 1, indent = indent, verbosity = verbosity)
-
-
-
-    def force_change(self, t_0, t_1, indent = 0, verbosity = 0):
+    def force_change(self, times, indent = 0, verbosity = 0):
         """Adds clauses forcing at least one cell to change between specified generations"""
 
+        (t_0, t_1) = times
         print_message("Forcing at least one cell to change between generations " + str(t_0) + " and " + str(t_1) + " ...", 3, indent = indent, verbosity = verbosity)
 
         starting_number_of_clauses = len(self.clauses.clause_set)
 
-        generation_0 = self.grid[t_0]
-        generation_1 = self.grid[t_1]
+        width = len(self.grid[0][0])
+        height = len(self.grid[0])
 
-        clause = []
+        self.force_unequal([(self.grid[t_0][y][x],self.grid[t_1][y][x]) for x in xrange(width) for y in xrange(height)])
 
-        for y, rows in enumerate(zip(generation_0,generation_1)):
-            for x, cells in enumerate(zip(*rows)):
-                cells_equal = ("x" + str(x) +
-                               "y" + str(y) +
-                               "is_equal_at" +
-                               "t" + str(t_0) +
-                               "and" +
-                               "t" + str(t_1))
-                self.clauses.append(implies(cells, cells_equal))
-                self.clauses.append(implies(map(negate, cells), cells_equal))
-                clause.append(negate(cells_equal))
-
-        self.clauses.append(clause)
         print_message(
             "Number of clauses used: " + str(len(self.clauses.clause_set) - starting_number_of_clauses),
             3,
             indent = indent + 1, verbosity = verbosity
         )
         print_message("Done\n", 3, indent = indent, verbosity = verbosity)
-
 
 
     def force_distinct(self, solution, determined = False, indent = 0, verbosity = 0):
@@ -271,6 +352,16 @@ class SearchPattern:
                             clause.append(cell)
                         else:
                             clause.append(negate(cell))
+
+        for t, generation in enumerate(self.background_grid):
+            for y, row in enumerate(generation):
+                for x, cell in enumerate(row):
+                    other_cell = solution.background_grid[t][y][x]
+                    assert other_cell in ["0", "1"], "Only use force_distinct against solved patterns"
+                    if other_cell == "0":
+                        clause.append(cell)
+                    else:
+                        clause.append(negate(cell))
 
         for transition, literal in self.rule.items():
             other_literal = solution.rule[transition]
@@ -389,60 +480,145 @@ class SearchPattern:
                 self.define_cardinality_variable(literals_2, at_least_2, already_defined, preprocessing = False)
         return name
 
-    def force_at_least(self, literals, at_least, indent = 0, verbosity = 0):
-        """Adds clauses forcing at least at_least of literals to be true"""
+    def force_symmetry(self, symmetry, indent = 0, verbosity = 0):
+        to_force_equal = self.cell_pairs_from_transformation(symmetry, indent = indent, verbosity = verbosity)
+        self.force_equal(to_force_equal)
+
+    def force_asymmetry(self, asymmetry, indent = 0, verbosity = 0):
+        to_force_unequal = self.cell_pairs_from_transformation(asymmetry, indent = indent, verbosity = verbosity)
+        self.force_unequal(to_force_unequal)
+
+    def cell_pairs_from_transformation(self, symmetry, indent = 0, verbosity = 0):
+        (
+            transformation,
+            x_translate,
+            y_translate,
+            period
+        ) = symmetry
+        transformation = transformation.upper()
+        width = len(self.grid[0][0])
+        height = len(self.grid[0])
+        duration = len(self.grid)
+        background_width = len(self.background_grid[0][0])
+        background_height = len(self.background_grid[0])
+        background_duration = len(self.background_grid)
+
+        if transformation == "RO0":
+            f = lambda x, y: (x + x_translate, y + y_translate)
+            f_inv = lambda x, y: (x - x_translate, y - y_translate)
+        elif transformation == "RO1":
+            f = lambda x, y: ((height - 1) - y + x_translate, x + y_translate)
+            f_inv = lambda x, y: (y - y_translate, (height - 1) - (x - x_translate))
+        elif transformation == "RO2":
+            f = lambda x, y: ((width - 1) - x + x_translate, (height - 1) - y + y_translate)
+            f_inv = lambda x, y: ((width - 1) - (x - x_translate), (height - 1) - (y - y_translate))
+        elif transformation == "RO3":
+            f = lambda x, y:  (y + x_translate, (height - 1) - x + y_translate)
+            f_inv = lambda x, y: ((height - 1) - (y - y_translate), x - x_translate)
+        elif transformation == "RE-":
+            f = lambda x, y: (x + x_translate, (height - 1) - y + y_translate)
+            f_inv = lambda x, y: (x - x_translate, (height - 1) - (y - y_translate))
+        elif transformation == "RE\\":
+            f = lambda x, y: (y + x_translate, x + y_translate)
+            f_inv = lambda x, y: (y - y_translate, x - x_translate)
+        elif transformation == "RE|":
+            f = lambda x, y: ((width - 1) - x + x_translate, y + y_translate)
+            f_inv = lambda x, y: ((width - 1) - (x - x_translate), y - y_translate)
+        elif transformation == "RE/":
+            f = lambda x, y: ((height - 1) - y + x_translate, (height - 1) - x + y_translate)
+            f_inv = lambda x, y: ((height - 1) - (y - y_translate), (height - 1) - (x - x_translate))
+
+        cell_pairs = []
+
+        for x in xrange(width):
+            for y in xrange(height):
+                for t in xrange(duration):
+                    cell = self.grid[t][y][x]
+                    if t < duration - period:
+                        other_x, other_y = f(x,y)
+                        if 0 <= other_x < width and 0 <= other_y < height:
+                            other_cell = self.grid[t + period][other_y][other_x]
+                        else:
+                            other_cell = self.background_grid[(t + period) % background_duration][other_y % background_height][other_x % background_width]
+                        cell_pairs.append((cell, other_cell))
+                    if t >= period:
+                        other_x, other_y = f_inv(x,y)
+                        if 0 <= other_x < width and 0 <= other_y < height:
+                            other_cell = self.grid[t - period][other_y][other_x]
+                        else:
+                            other_cell = self.background_grid[(t - period) % background_duration][other_y % background_height][other_x % background_width]
+                        cell_pairs.append((cell, other_cell))
+        return cell_pairs
+
+    def force_at_least(self, literals, amount, indent = 0, verbosity = 0):
+        """Adds clauses forcing at least the given amount of literals to be true"""
 
         starting_number_of_clauses = len(self.clauses.clause_set)
-        name = self.define_cardinality_variable(literals, at_least)
+        name = self.define_cardinality_variable(literals, amount)
         self.clauses.append([name])
         print_message(
             "Number of clauses used: " + str(len(self.clauses.clause_set) - starting_number_of_clauses),
             3,
-            indent = indent + 1, verbosity = verbosity
+            indent = indent, verbosity = verbosity
         )
 
-    def force_at_most(self, literals, at_most, indent = 0, verbosity = 0):
-        """Adds clauses forcing at least at_least of literals to be true"""
 
-        self.force_at_least(map(negate, literals), len(literals) - at_most, indent = indent, verbosity = verbosity)
+    def force_at_most(self, literals, amount, indent = 0, verbosity = 0):
+        """Adds clauses forcing at most the given amount of literals to be true"""
 
-    def force_symmetry(self, symmetry, indent = 0, verbosity = 0):
-        """Changes the grid to enforce the specified symmetry"""
+        self.force_at_least(map(negate, literals), len(literals) - amount, indent = indent, verbosity = verbosity)
 
-        symmetry = symmetry.upper()
 
-        if symmetry == "C1":
-            return None
+    def force_exactly(self, literals, amount, indent=0, verbosity=0):
+        """Adds clauses forcing exactly the given amount of literals to be true"""
 
-        print_message("Enforcing symmetry...", 3, indent = indent, verbosity = verbosity)
+        self.force_at_least(literals, amount, indent = indent, verbosity = verbosity)
+        self.force_at_most(literals, amount, indent = indent, verbosity = verbosity)
 
-        symmetries = ["C1","C2","C4","D2-","D2/","D2|","D2\\","D4+","D4X","D8"]
-        assert symmetry in symmetries, "Specified symmetry is unknown"
+    def force_population_at_least(self, constraint, indent=0, verbosity=0):
+        (times, population) = constraint
+        print_message(
+            "Forcing the population in generation" + ("s" if len(times) > 1 else "") + " " + ", ".join(str(t) for t in times) + " to be at least " + str(population),
+            3,
+            indent = indent, verbosity = verbosity
+        )
+        literals = [cell for t in times for row in self.grid[t] for cell in row]
+        self.force_at_least(literals, population, indent = indent + 1, verbosity = verbosity)
+        print_message(
+            "Done\n",
+            3,
+            indent = indent, verbosity = verbosity
+        )
 
-        width = len(self.grid[0][0])
-        height = len(self.grid[0])
+    def force_population_at_most(self, constraint, indent = 0, verbosity = 0):
+        (times, population) = constraint
+        print_message(
+            "Forcing the population in generation" + ("s" if len(times) > 1 else "") + " " + ", ".join(str(t) for t in times) + " to be at most " + str(population),
+            3,
+            indent = indent, verbosity = verbosity
+        )
+        literals = [cell for t in times for row in self.grid[t] for cell in row]
+        self.force_at_most(literals, population, indent = indent + 1, verbosity = verbosity)
+        print_message(
+            "Done\n",
+            3,
+            indent = indent, verbosity = verbosity
+        )
 
-        if symmetry in ["C4","D2/","D2\\","D4X","D8"]:
-            assert width == height, "Pattern must have width = height for the given symmetry"
-
-        to_force_equal = []
-        for t, generation in enumerate(self.grid):
-            for y, row in enumerate(generation):
-                for x, cell in enumerate(row):
-                    if symmetry == "C2":
-                        to_force_equal.append((self.grid[t][y][x], self.grid[t][height-y-1][width-x-1]))
-                    if symmetry == "C4":
-                        to_force_equal.append((self.grid[t][y][x], self.grid[t][height-x-1][y]))
-                    if symmetry in ["D2-","D4+","D8"]:
-                        to_force_equal.append((self.grid[t][y][x], self.grid[t][height-y-1][x]))
-                    if symmetry in ["D2/","D4X","D8"]:
-                        to_force_equal.append((self.grid[t][y][x], self.grid[t][height-x-1][width-y-1]))
-                    if symmetry in ["D2|","D4+"]:
-                        to_force_equal.append((self.grid[t][y][x], self.grid[t][y][width-x-1]))
-                    if symmetry in ["D2\\","D4X"]:
-                        to_force_equal.append((self.grid[t][y][x], self.grid[t][x][y]))
-        self.force_equal(to_force_equal)
-        print_message("Done\n", 3, indent = indent, verbosity = verbosity)
+    def force_population_exactly(self, constraint, indent = 0, verbosity = 0):
+        (times, population) = constraint
+        print_message(
+            "Forcing the population in generation" + ("s" if len(times) > 1 else "") + " " + ", ".join(str(t) for t in times) + " to be exactly " + str(population),
+            3,
+            indent = indent, verbosity = verbosity
+        )
+        literals = [cell for t in times for row in self.grid[t] for cell in row]
+        self.force_exactly(literals, population, indent = indent + 1, verbosity = verbosity)
+        print_message(
+            "Done\n",
+            3,
+            indent = indent, verbosity = verbosity
+        )
 
     def force_equal(self, argument_0, argument_1 = None):
 
@@ -509,6 +685,15 @@ class SearchPattern:
                             if replacement[variable] != variable:
                                 self.grid[t][y][x] = negate(replacement[variable], negated)
 
+        for t, generation in enumerate(self.background_grid):
+            for y, row in enumerate(generation):
+                for x, cell in enumerate(row):
+                    if cell not in ["0", "1"]:
+                        variable, negated = variable_from_literal(cell)
+                        if replacement.has_key(variable):
+                            if replacement[variable] != variable:
+                                self.background_grid[t][y][x] = negate(replacement[variable], negated)
+
         for transition, literal in self.rule.items():
             if literal not in ["0", "1"]:
                 variable, negated = variable_from_literal(literal)
@@ -516,48 +701,29 @@ class SearchPattern:
                     if replacement[variable] != variable:
                         self.rule[transition] = negate(replacement[variable], negated)
 
-    def force_period(self, period, x_translate = None, y_translate = None, indent = 0, verbosity = 0):
+    def force_unequal(self, argument_0, argument_1 = None):
+        if argument_1 != None:
+            assert isinstance(argument_0, basestring) and isinstance(argument_1, basestring), "force_equal arguments not understood"
+            cell_pair_list = [(argument_0, argument_1)]
+        elif argument_0 == []:
+            return
+        elif isinstance(argument_0[0], basestring):
+                assert len(argument_0) == 2 and isinstance(argument_0[1], basestring), "force_equal arguments not understood"
+                cell_pair_list = [argument_0]
+        else:
+            cell_pair_list = argument_0
 
-        if period != None:
+        clause = []
+        for cell_pair in cell_pair_list:
+                cells_equal = str(cell_pair[0]) + "_equals_" + str(cell_pair[1])
+                self.clauses.append(implies(cell_pair, cells_equal))
+                self.clauses.append(implies(map(negate, cell_pair), cells_equal))
+                clause.append(negate(cells_equal))
 
-            width = len(self.grid[0][0])
-            height = len(self.grid[0])
-            duration = len(self.grid)
-
-            if x_translate is None:
-                x_translate = 0
-            if y_translate is None:
-                y_translate = 0
-            if (x_translate, y_translate) == (0, 0):
-                if period == 1:
-                    print_message("Forcing pattern to be a still life...", 3, indent = indent, verbosity = verbosity)
-                else:
-                    print_message("Forcing pattern to have period " + str(period) + " ...", 3, indent = indent, verbosity = verbosity)
-            else:
-                print_message("Forcing pattern to move with speed (" + str(x_translate) + ", " + str(y_translate) + ")c/" + str(period) + " ...", 3, indent = indent, verbosity = verbosity)
-
-            to_force_equal = []
-            for t, generation in enumerate(self.grid):
-                for y, row in enumerate(generation):
-                    for x, cell in enumerate(row):
-                        if t - period in range(duration):
-                            if x - x_translate in range(width) and y - y_translate in range(height):
-                                to_force_equal.append((self.grid[t][y][x], self.grid[t - period][y - y_translate][x - x_translate]))
-                            else:
-                                to_force_equal.append((self.grid[t][y][x], "0"))
-                        if t + period in range(duration):
-                            if x + x_translate in range(width) and y + y_translate in range(height):
-                                to_force_equal.append((self.grid[t][y][x], self.grid[t + period][y + y_translate][x + x_translate]))
-                            else:
-                                to_force_equal.append((self.grid[t][y][x], "0"))
-
-            self.force_equal(to_force_equal)
-            print_message("Done\n", 3, indent = indent, verbosity = verbosity)
+        self.clauses.append(clause)
 
 
-
-
-    def make_string(self, pattern_output_format = None, determined = None, indent = 0, verbosity = 0):
+    def make_string(self, pattern_output_format = None, determined = None, show_background = None, indent = 0, verbosity = 0):
         if pattern_output_format == None:
             pattern_output_format = LLS_defaults.pattern_output_format
 
@@ -565,10 +731,31 @@ class SearchPattern:
 
         assert pattern_output_format in ["rle","csv"], "Format not recognised"
 
+        background_grid = copy.deepcopy(self.background_grid)
+        LLS_literal_manipulation.offset_background(background_grid,-1,-1,0)
+        background_ignore_transition = copy.deepcopy(self.background_ignore_transition)
+        LLS_literal_manipulation.offset_background(background_ignore_transition,-1,-1,0)
+
         if pattern_output_format == "rle":
-            output_string = LLS_formatting.make_rle(self.grid, rule = self.rule, determined = determined, indent = indent + 1, verbosity = verbosity)
+            output_string = LLS_formatting.make_rle(
+                self.grid,
+                background_grid = background_grid,
+                rule = self.rule,
+                determined = determined,
+                show_background = show_background,
+                indent = indent + 1, verbosity = verbosity
+            )
         elif pattern_output_format == "csv":
-            output_string = LLS_formatting.make_csv(self.grid, ignore_transition = self.ignore_transition, rule = self.rule, determined = determined, indent = indent + 1, verbosity = verbosity)
+            output_string = LLS_formatting.make_csv(
+                self.grid,
+                ignore_transition = self.ignore_transition,
+                background_grid = background_grid,
+                background_ignore_transition = background_ignore_transition,
+                rule = self.rule,
+                determined = determined,
+                show_background = show_background,
+                indent = indent + 1, verbosity = verbosity
+            )
 
         print_message('Done\n', 3, indent = indent, verbosity = verbosity)
 
@@ -581,6 +768,7 @@ class SearchPattern:
         """Return a copy of the search_pattern with the solution substituted back into it"""
         grid = copy.deepcopy(self.grid)
         rule = copy.deepcopy(self.rule)
+        background_grid = copy.deepcopy(self.background_grid)
 
         print_message('Substituting solution back into search grid...', 3, indent = indent, verbosity = verbosity)
 
@@ -606,6 +794,25 @@ class SearchPattern:
                         else:
                             grid[t][y][x] = "0"
 
+        for t, generation in enumerate(background_grid):
+            for y, row in enumerate(generation):
+                for x, cell in enumerate(row):
+                    if cell in ["0","1"]:
+                        pass
+                    else:
+                        (CNF_variable, negated) = variable_from_literal(cell)
+                        if self.clauses.DIMACS_literal_from_variable.has_key(CNF_variable):
+                            DIMACS_variable = self.clauses.DIMACS_literal_from_variable[CNF_variable]
+
+                            DIMACS_literal = negate(DIMACS_variable, negated)
+
+                            if DIMACS_literal in solution:
+                                background_grid[t][y][x] = "1"
+                            else:
+                                background_grid[t][y][x] = "0"
+                        else:
+                            background_grid[t][y][x] = "0"
+
         for transition, literal in rule.items():
             if literal in ["0","1"]:
                 pass
@@ -622,10 +829,12 @@ class SearchPattern:
                         rule[transition] = "0"
                 else:
                     rule[transition] = "0"
-
+        width = len(grid[0][0])
+        height = len(grid[0])
+        duration = len(grid)
         print_message('Done\n', 3, indent = indent, verbosity = verbosity)
 
-        return SearchPattern(grid, rule = rule)
+        return SearchPattern(grid, background_grid = background_grid, rule = rule, add_border = False)
 
 
 
@@ -662,3 +871,10 @@ class SearchPattern:
             return True
         else:
             return False
+
+    def background_nontrivial(self):
+        return (
+            len(self.background_grid[0]) > 1
+            and len(self.background_grid[0][0]) > 1
+            and any(cell not in ["0","1"] for generation in self.background_grid for row in generation for cell in row)
+        )

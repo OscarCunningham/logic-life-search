@@ -10,22 +10,19 @@ from LLS_literal_manipulation import negate
 
 def LLS(
     search_pattern,
-    symmetry="C1",
-    period=None,
-    x_translate=0,
-    y_translate=0,
-    force_movement=False,
+    symmetries=[],
+    asymmetries=[],
+    population_at_most=[],
+    population_at_least=[],
+    population_exactly=[],
+    force_change=[],
+    force_evolution=True,
     solver=None,
     parameters=None,
     timeout=None,
     save_dimacs=None,
     save_state=None,
     method=None,
-    force_at_most=[],
-    force_at_least=[],
-    force_change=[],
-    force_nonempty=False,
-    force_evolution=True,
     dry_run=False,
     number_of_solutions=None,
     pattern_output_format=None,
@@ -46,22 +43,18 @@ def LLS(
         time_taken
     ) = preprocess_and_solve(
         search_pattern,
-        symmetry = symmetry,
-        period = period,
-        x_translate = x_translate,
-        y_translate = y_translate,
-        force_movement = force_movement,
+        symmetries = symmetries,
+        asymmetries = asymmetries,
+        population_at_most = population_at_most,
+        population_at_least = population_at_least,
+        population_exactly = population_exactly,
+        force_change = force_change,
         solver = solver,
         parameters = parameters,
         timeout = timeout,
         save_dimacs = save_dimacs,
         save_state = save_state,
         method = method,
-        force_at_most = force_at_most,
-        force_at_least = force_at_least,
-        force_change = force_change,
-        force_nonempty = force_nonempty,
-        force_evolution = force_evolution,
         dry_run = dry_run,
         indent = indent, verbosity = verbosity
     )
@@ -72,10 +65,12 @@ def LLS(
 
     if sat == "SAT":
         determined = search_pattern.deterministic(indent = indent, verbosity = verbosity)
+        show_background = search_pattern.background_nontrivial()
         solutions.append(solution)
         output_string = solution.make_string(
             pattern_output_format = pattern_output_format,
             determined = determined,
+            show_background = show_background,
             indent = indent, verbosity = verbosity
         )
     else:
@@ -120,7 +115,7 @@ def LLS(
             time_taken += extra_time_taken
             if sat == "SAT":
                 solutions.append(solution)
-                output_string = solution.make_string(pattern_output_format = pattern_output_format, determined = determined, indent = indent, verbosity = verbosity)
+                output_string = solution.make_string(pattern_output_format = pattern_output_format, determined = determined, show_background = show_background, indent = indent, verbosity = verbosity)
                 if verbosity == 1:
                     print_message("", 1, indent = indent, verbosity = verbosity)
             else:
@@ -140,22 +135,19 @@ def LLS(
 
 
 def preprocess_and_solve(search_pattern,
-    symmetry="C1",
-    period=None,
-    x_translate=0,
-    y_translate=0,
-    force_movement=False,
+    symmetries=[],
+    asymmetries=[],
+    population_at_most=[],
+    population_at_least=[],
+    population_exactly=[],
+    force_change=[],
+    force_evolution=True,
     solver=None,
     parameters=None,
     timeout=None,
     save_dimacs=None,
     save_state=None,
     method=None,
-    force_at_most=[],
-    force_at_least=[],
-    force_change=[],
-    force_nonempty=False,
-    force_evolution=True,
     dry_run=False,
     indent=0, verbosity=0
 ):
@@ -163,17 +155,13 @@ def preprocess_and_solve(search_pattern,
     try:
         preprocess(
             search_pattern,
-            symmetry = symmetry,
-            period = period,
-            x_translate = x_translate,
-            y_translate = y_translate,
-            force_movement = force_movement,
-            method = method,
-            force_at_most = force_at_most,
-            force_at_least = force_at_least,
+            symmetries = symmetries,
+            asymmetries = asymmetries,
+            population_at_most = population_at_most,
+            population_at_least = population_at_least,
+            population_exactly = population_exactly,
             force_change = force_change,
-            force_nonempty = force_nonempty,
-            force_evolution = force_evolution,
+            method = method,
             indent = indent, verbosity = verbosity
         )
         if save_state:
@@ -188,7 +176,7 @@ def preprocess_and_solve(search_pattern,
             print_message("Saving state...", 3, indent = indent + 1, verbosity = verbosity)
             LLS_files.file_from_object(
                 state_file,
-                (search_pattern.grid, search_pattern.ignore_transition, search_pattern.rule, search_pattern.clauses.DIMACS_literal_from_variable),
+                (search_pattern.grid, search_pattern.ignore_transition, search_pattern.background_grid, search_pattern.background_ignore_transition, search_pattern.rule, search_pattern.clauses.DIMACS_literal_from_variable),
                 indent = indent + 2, verbosity = verbosity
             )
             print_message("Done\n", 3, indent = indent + 1, verbosity = verbosity)
@@ -199,26 +187,26 @@ def preprocess_and_solve(search_pattern,
         active_width = sum(
             any(
             any(
-            (search_pattern.grid[z][y][x] not in ["0","1"])
+            (search_pattern.grid[t][y][x] not in ["0","1"])
             for y in range(height))
-            for z in range(duration))
+            for t in range(duration))
             for x in range(width)
         )
         active_height = sum(
             any(
             any(
-            (search_pattern.grid[z][y][x] not in ["0","1"])
-            for z in range(duration))
+            (search_pattern.grid[t][y][x] not in ["0","1"])
+            for t in range(duration))
             for x in range(width))
             for y in range(height)
         )
         active_duration = sum(
             any(
             any(
-            (search_pattern.grid[z][y][x] not in ["0","1"])
+            (search_pattern.grid[t][y][x] not in ["0","1"])
             for x in range(width))
             for y in range(height))
-            for z in range(duration)
+            for t in range(duration)
         )
         number_of_cells = search_pattern.number_of_cells()
         number_of_variables = search_pattern.clauses.number_of_variables
@@ -277,83 +265,47 @@ def preprocess_and_solve(search_pattern,
 
 def preprocess(
     search_pattern,
-    symmetry="C1",
-    period=None,
-    x_translate=0,
-    y_translate=0,
-    force_movement=False,
-    method=None,
-    force_at_most=False,
-    force_at_least=False,
+    symmetries=[],
+    asymmetries=[],
+    population_at_most=[],
+    population_at_least=[],
+    population_exactly=[],
     force_change=[],
-    force_nonempty=False,
     force_evolution=True,
+    method=None,
     indent=0, verbosity=0
 ):
     """Apply constraints and create SAT problem"""
     print_message('Preprocessing...', indent = indent, verbosity = verbosity)
 
     # Constraints that change the grid
-    search_pattern.force_symmetry(symmetry, indent = indent + 1, verbosity = verbosity)
-    search_pattern.force_period(period, x_translate, y_translate, indent = indent + 1, verbosity = verbosity)
+    search_pattern.standardise_varaibles_names(indent = indent + 1, verbosity = verbosity)
+    for symmetry in symmetries:
+        search_pattern.force_symmetry(symmetry, indent = indent + 1, verbosity = verbosity)
 
     search_pattern.remove_redundancies(indent = indent + 1, verbosity = verbosity)
+    search_pattern.standardise_varaibles_names(indent = indent + 1, verbosity = verbosity)
 
     print_message(
         "Search grid:\n",
         3,
         indent = indent + 1, verbosity = verbosity)
     print_message(
-        search_pattern.make_string(pattern_output_format = "csv"),
+        search_pattern.make_string(pattern_output_format = "csv", show_background = True),
         3,
         indent = indent + 2, verbosity = verbosity)
 
     #Constraints that are enforced by clauses
-    if force_nonempty:
-        search_pattern.force_nonempty(indent = indent + 1, verbosity = verbosity)
-    if force_movement:
-        search_pattern.force_movement(indent = indent + 1, verbosity = verbosity)
-    for t_0, t_1 in force_change:
-        search_pattern.force_change(t_0, t_1, indent = indent + 1, verbosity = verbosity)
-    for arguments in force_at_least:
-        amount, ts = arguments[0], arguments[1:]
-        if ts == []:
-            ts = [0]
-        if len(ts) == 1:
-            print_message(
-                'Enforcing at least ' + str(amount) + ' cells in generation ' + str(ts[0]) + ' ...',
-                3,
-                indent = indent+1, verbosity = verbosity
-            )
-        else:
-            print_message(
-                'Enforcing at least ' + str(amount) + ' cells in generations ' + str(ts) + ' ...',
-                3,
-                indent = indent+1, verbosity = verbosity
-            )
-        literals = []
-        literals = [literal for t in ts for row in search_pattern.grid[t] for literal in row]
-        search_pattern.force_at_least(literals, amount, indent = indent+1, verbosity = verbosity)
-        print_message('Done\n', 3, indent = indent+1, verbosity = verbosity)
-    for arguments in force_at_most:
-        amount, ts = arguments[0], arguments[1:]
-        if ts == []:
-            ts = [0]
-        if len(ts) == 1:
-            print_message(
-                'Enforcing at most ' + str(amount) + ' cells in generation ' + str(ts[0]) + ' ...',
-                3,
-                indent = indent+1, verbosity = verbosity
-            )
-        else:
-            print_message(
-                'Enforcing at most ' + str(amount) + ' cells in generations ' + str(ts) + ' ...',
-                3,
-                indent = indent+1, verbosity = verbosity
-            )
-        literals = [literal for t in ts for row in search_pattern.grid[t] for literal in row]
-        search_pattern.force_at_most(literals, amount, indent = indent+1, verbosity = verbosity)
-        print_message('Done\n', 3, indent = indent+1, verbosity = verbosity)
+    for asymmetry in asymmetries:
+        search_pattern.force_asymmetry(asymmetry, indent = indent + 1, verbosity = verbosity)
+    for constraint in population_at_most:
+        search_pattern.force_population_at_most(constraint, indent = indent + 1, verbosity = verbosity)
+    for constraint in population_at_least:
+        search_pattern.force_population_at_least(constraint, indent = indent + 1, verbosity = verbosity)
+    for constraint in population_exactly:
+        search_pattern.force_population_exactly(constraint, indent = indent + 1, verbosity = verbosity)
+    for times in force_change:
+        search_pattern.force_change(times, indent = indent + 1, verbosity = verbosity)
 
 
     if force_evolution:

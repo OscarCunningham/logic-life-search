@@ -41,7 +41,7 @@ def maximum_number_of_live_cells(letter):
 
 
 
-def definition_clauses(search_pattern, x, y, t, letter, at_least):
+def definition_clauses(search_pattern, grid, x, y, t, letter, at_least):
     """Defines clauses that define variables for Knuth's neighbour counting scheme"""
 
     if letter == None:
@@ -58,48 +58,48 @@ def definition_clauses(search_pattern, x, y, t, letter, at_least):
 
         # If at_least is obviously too small or too big, give the obvious answer
         if at_least <= 0:
-            search_pattern.clauses.append([literal_name(search_pattern.grid, x, y, t, letter, at_least)])
+            search_pattern.clauses.append([literal_name(grid, x, y, t, letter, at_least)])
         elif at_least > maximum_number_of_live_cells_1 + maximum_number_of_live_cells_2:
-            search_pattern.clauses.append([negate(literal_name(search_pattern.grid, x, y, t, letter, at_least))])
+            search_pattern.clauses.append([negate(literal_name(grid, x, y, t, letter, at_least))])
 
         # Otherwise define the appropriate clauses
         else:
             if at_least <= maximum_number_of_live_cells_1:
-                search_pattern.clauses.append([negate(literal_name(search_pattern.grid, child_1_x, child_1_y, t, child_1_letter, at_least)),
-                                literal_name(search_pattern.grid, x, y, t, letter, at_least)])
+                search_pattern.clauses.append([negate(literal_name(grid, child_1_x, child_1_y, t, child_1_letter, at_least)),
+                                literal_name(grid, x, y, t, letter, at_least)])
                 child_1_needing_definition.append(at_least)
             for j in range(1, maximum_number_of_live_cells_2 + 1):
                 for i in range(1, maximum_number_of_live_cells_1 + 1):
                     if i + j == at_least:
                         search_pattern.clauses.append([
-                                negate(literal_name(search_pattern.grid, child_1_x, child_1_y, t, child_1_letter, i)),
-                                negate(literal_name(search_pattern.grid, child_2_x, child_2_y, t, child_2_letter, j)),
-                                literal_name(search_pattern.grid, x, y, t, letter, at_least)])
+                                negate(literal_name(grid, child_1_x, child_1_y, t, child_1_letter, i)),
+                                negate(literal_name(grid, child_2_x, child_2_y, t, child_2_letter, j)),
+                                literal_name(grid, x, y, t, letter, at_least)])
                         child_1_needing_definition.append(i)
                         child_2_needing_definition.append(j)
             if at_least <= maximum_number_of_live_cells_2:
-                search_pattern.clauses.append([negate(literal_name(search_pattern.grid, child_2_x, child_2_y, t, child_2_letter, at_least)),
-                                literal_name(search_pattern.grid, x, y, t, letter, at_least)])
+                search_pattern.clauses.append([negate(literal_name(grid, child_2_x, child_2_y, t, child_2_letter, at_least)),
+                                literal_name(grid, x, y, t, letter, at_least)])
                 child_2_needing_definition.append(at_least)
 
             if at_least > maximum_number_of_live_cells_2:
                 i = at_least - maximum_number_of_live_cells_2
-                search_pattern.clauses.append([literal_name(search_pattern.grid, child_1_x, child_1_y, t, child_1_letter, i),
-                                negate(literal_name(search_pattern.grid, x, y, t, letter, at_least))])
+                search_pattern.clauses.append([literal_name(grid, child_1_x, child_1_y, t, child_1_letter, i),
+                                negate(literal_name(grid, x, y, t, letter, at_least))])
                 child_1_needing_definition.append(i)
             for j in range(1, maximum_number_of_live_cells_2 + 1):
                 for i in range(1, maximum_number_of_live_cells_1 + 1):
                     if i + j == at_least + 1:
                         search_pattern.clauses.append([
-                                literal_name(search_pattern.grid, child_1_x, child_1_y, t, child_1_letter, i),
-                                literal_name(search_pattern.grid, child_2_x, child_2_y, t, child_2_letter, j),
-                                negate(literal_name(search_pattern.grid, x, y, t, letter, at_least))])
+                                literal_name(grid, child_1_x, child_1_y, t, child_1_letter, i),
+                                literal_name(grid, child_2_x, child_2_y, t, child_2_letter, j),
+                                negate(literal_name(grid, x, y, t, letter, at_least))])
                         child_1_needing_definition.append(i)
                         child_2_needing_definition.append(j)
             if at_least > maximum_number_of_live_cells_1:
                 j = at_least - maximum_number_of_live_cells_1
-                search_pattern.clauses.append([literal_name(search_pattern.grid, child_2_x, child_2_y, t, child_2_letter, j),
-                                negate(literal_name(search_pattern.grid, x, y, t, letter, at_least))])
+                search_pattern.clauses.append([literal_name(grid, child_2_x, child_2_y, t, child_2_letter, j),
+                                negate(literal_name(grid, x, y, t, letter, at_least))])
                 child_2_needing_definition.append(j)
 
         # Remove duplicates from our lists of child variables we need to define
@@ -108,9 +108,9 @@ def definition_clauses(search_pattern, x, y, t, letter, at_least):
 
         # Define the child variables
         for child_1_at_least in child_1_needing_definition:
-            definition_clauses(search_pattern, child_1_x, child_1_y, t, child_1_letter, child_1_at_least)
+            definition_clauses(search_pattern, grid, child_1_x, child_1_y, t, child_1_letter, child_1_at_least)
         for child_2_at_least in child_2_needing_definition:
-            definition_clauses(search_pattern, child_2_x, child_2_y, t, child_2_letter, child_2_at_least)
+            definition_clauses(search_pattern, grid, child_2_x, child_2_y, t, child_2_letter, child_2_at_least)
 
 
 
@@ -135,39 +135,41 @@ def literal_name(grid, x, y, t, letter=None, at_least=1):
     return literal
 
 
-def transition_rule(search_pattern, x, y, t):
+def transition_rule(search_pattern, grid, x, y, t):
     """Creates clauses enforcing the transition rule at coordinates x, y, t of grid"""
 
-    # These clauses define variables a_i meaning at least i of the neighbours were alive at time t - 1
-    definition_clauses(search_pattern, x, y, t - 1, "a", at_least = 2)
-    definition_clauses(search_pattern, x, y, t - 1, "a", at_least = 3)
-    definition_clauses(search_pattern, x, y, t - 1, "a", at_least = 4)
+    duration = len(grid)
 
-    cell = literal_name(search_pattern.grid, x, y, t)
-    predecessor_cell = literal_name(search_pattern.grid, x, y, t - 1)
+    # These clauses define variables a_i meaning at least i of the neighbours were alive at time t - 1
+    definition_clauses(search_pattern, grid, x, y, (t - 1) % duration, "a", at_least = 2)
+    definition_clauses(search_pattern, grid, x, y, (t - 1) % duration, "a", at_least = 3)
+    definition_clauses(search_pattern, grid, x, y, (t - 1) % duration, "a", at_least = 4)
+
+    cell = literal_name(grid, x, y, t)
+    predecessor_cell = literal_name(grid, x, y, (t - 1) % duration)
     # These clauses implement the cellular automaton rule
 
     # If there are at least 4 neighbours in the previous generation then the cell dies
     search_pattern.clauses.append(implies(
-        literal_name(search_pattern.grid, x, y, t - 1, "a", at_least = 4),
+        literal_name(grid, x, y, (t - 1) % duration, "a", at_least = 4),
         negate(cell)))
     # If there aren't at least 2 neighbours in the previous generation then the cell dies
     search_pattern.clauses.append(implies(
-        negate(literal_name(search_pattern.grid, x, y, t - 1, "a", at_least = 2)),
+        negate(literal_name(grid, x, y, (t - 1) % duration, "a", at_least = 2)),
         negate(cell)))
     # If the predecessor is dead and there aren't at least 3 neighbours then the cell dies
     search_pattern.clauses.append(implies([
         negate(predecessor_cell),
-        negate(literal_name(search_pattern.grid, x, y, t - 1, "a", at_least = 3))],
+        negate(literal_name(grid, x, y, (t - 1) % duration, "a", at_least = 3))],
         negate(cell)))
     # If there are exactly 3 neighbours then the cell lives
     search_pattern.clauses.append(implies([
-        negate(literal_name(search_pattern.grid, x, y, t - 1, "a", at_least = 4)),
-        literal_name(search_pattern.grid, x, y, t - 1, "a", at_least = 3)],
+        negate(literal_name(grid, x, y, (t - 1) % duration, "a", at_least = 4)),
+        literal_name(grid, x, y, (t - 1) % duration, "a", at_least = 3)],
         cell))
     # If the predecessor is alive and there are at least 2 neighbours but not at least 4 neighbours then the cell lives
     search_pattern.clauses.append(implies([
         predecessor_cell,
-        literal_name(search_pattern.grid, x, y, t - 1, "a", at_least = 2),
-        negate(literal_name(search_pattern.grid, x, y, t - 1, "a", at_least = 4))],
+        literal_name(grid, x, y, (t - 1) % duration, "a", at_least = 2),
+        negate(literal_name(grid, x, y, (t - 1) % duration, "a", at_least = 4))],
         cell))

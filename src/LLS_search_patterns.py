@@ -28,96 +28,14 @@ def search_pattern_from_string(input_string, indent = 0, verbosity = 0):
     return grid, ignore_transition
 
 
-def blank_search_pattern(x_bound, y_bound, duration, indent = 0, verbosity = 0):
+def blank_search_pattern(width, height, duration, indent = 0, verbosity = 0):
     print_message('Creating spaceship search pattern...', 3, indent = indent, verbosity = verbosity)
 
-
-    width = x_bound + 2
-    height = y_bound + 2
-
-    grid = [[["0" for i in range(width)] for j in range(height)] for k in range(duration)]
-
-    for t in range(duration):
-        for y in range(y_bound):
-            for x in range(x_bound):
-                grid[t][y+1][x+1] = "*"
+    grid = [[["*" for i in range(width)] for j in range(height)] for k in range(duration)]
 
     print_message("Pattern created:\n" + LLS_formatting.make_csv(grid) + "\n", 3, indent = indent+1, verbosity = verbosity)
     print_message('Done\n', 3, indent = indent, verbosity = verbosity)
     return grid
-
-
-def crawler_search_pattern(
-    x_bound,
-    y_bound,
-    x_translate,
-    y_translate,
-    period,
-    offset = False,
-    indent = 0, verbosity = 0
-):
-    print_message('Creating agar crawler search pattern...', 3, indent = indent, verbosity = verbosity)
-
-    width = x_translate + x_bound + 4
-    height = y_translate + y_bound + 4
-    duration = period + 1
-
-    if offset:
-        booleans = ("0","1")
-    else:
-        booleans = ("1","0")
-
-    grid = [[[
-        booleans[0] if y % 2 == 0 else booleans[1]
-        for x in range(width)]
-        for y in range(height)]
-        for generation in range(duration)
-    ]
-    ignore_transition = [[[
-        False
-        for x in range(width)]
-        for y in range(height)]
-        for generation in range(duration)
-    ]
-
-    for x in range(width):
-        for y in range(height):
-            for t in range(duration):
-                if x in [0, width-1] or y in [0, height - 1]:
-                    ignore_transition[t][y][x] = True
-                if x in range(2,width - 2) and y in range(2, height - 2):
-                    grid[t][y][x] = "*"
-
-    search_pattern = SearchPattern(grid,ignore_transition = ignore_transition)
-    search_pattern.standardise_varaibles_names()
-
-    to_force_equal = []
-    for t, generation in enumerate(search_pattern.grid):
-        for y, row in enumerate(generation):
-            for x, cell in enumerate(row):
-                if t - period in range(duration):
-                    if x - x_translate in range(width) and y - y_translate in range(height):
-                        to_force_equal.append((search_pattern.grid[t][y][x], search_pattern.grid[t - period][y - y_translate][x - x_translate]))
-                    else:
-                        to_force_equal.append((search_pattern.grid[t][y][x], booleans[0] if y % 2 == 0 else booleans[1]))
-                if t + period in range(duration):
-                    if x + x_translate in range(width) and y + y_translate in range(height):
-                        to_force_equal.append((search_pattern.grid[t][y][x], search_pattern.grid[t + period][y + y_translate][x + x_translate]))
-                    else:
-                        to_force_equal.append((search_pattern.grid[t][y][x], booleans[0] if y % 2 == 0 else booleans[1]))
-
-    search_pattern.force_equal(to_force_equal)
-
-    search_pattern.standardise_varaibles_names(indent = indent + 1, verbosity = verbosity)
-    print_message(
-        "Pattern created:\n" + search_pattern.make_string(pattern_output_format = "csv") + "\n",
-        3,
-        indent = indent+1, verbosity = verbosity
-    )
-    print_message('Done\n', 3, indent = indent, verbosity = verbosity)
-
-    return search_pattern.grid, search_pattern.ignore_transition
-
 
 def check_orphan(file_name, number_of_generations, indent = 0, verbosity = 0):
     print_message(
@@ -156,10 +74,10 @@ def check_orphan(file_name, number_of_generations, indent = 0, verbosity = 0):
         for y in range(height):
             for x in range(width):
                 if t == number_of_generations - 1:
-                    neighbours = neighbours_from_coordinates(grid,x,y,t,t_offset=1,outside_border="*")
+                    neighbours = neighbours_from_coordinates(grid,x,y,t,t_offset=1,background_grid=[[["*"]]])
                     nonempties = ["0", "1"]
                 else:
-                    neighbours = neighbours_from_coordinates(grid,x,y,t,t_offset=1,outside_border="0")
+                    neighbours = neighbours_from_coordinates(grid,x,y,t,t_offset=1)
                     nonempties = ["*"]
                 if any(nonempty in neighbours for nonempty in nonempties):
                     grid[t][y][x] = "*"
@@ -565,9 +483,18 @@ def hwss_eater_search_pattern(width,height,digestion_time,symmetry="C1",indent =
     print_message('Done\n', 3, indent = indent, verbosity = verbosity)
     return search_pattern.grid, search_pattern.ignore_transition
 
-def stator_search_pattern(pattern, rule=None, indent=0, verbosity=0):
+def stator_search_pattern(pattern, rule=None, background_grid=None, indent=0, verbosity=0):
     if rule == None:
         rule = LLS_rules.rule_from_rulestring(LLS_defaults.rulestring)
+    if background_grid == None:
+        (
+            background_grid,
+            _
+        ) = LLS_formatting.parse_input_string(
+            LLS_files.string_from_file(
+                "backgrounds/" + LLS_defaults.background,
+            )
+        )
     width = len(pattern[0])
     height = len(pattern)
     grid = [pattern]
@@ -580,7 +507,7 @@ def stator_search_pattern(pattern, rule=None, indent=0, verbosity=0):
         for x in xrange(width):
             for y in xrange(height):
                 BS_letter = "S" if grid[-2][y][x] == "1" else "B"
-                grid[-1][y][x] = rule[BS_letter + LLS_rules.transition_from_cells(neighbours_from_coordinates(grid,x,y,-1))]
+                grid[-1][y][x] = rule[BS_letter + LLS_rules.transition_from_cells(neighbours_from_coordinates(grid,x,y,-1, background_grid = background_grid))]
         if grid[0] == grid[-1]:
             break
     number_of_variables = 0

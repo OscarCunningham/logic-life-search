@@ -2,7 +2,7 @@ import re
 import copy
 import LLS_rules
 from LLS_messages import print_message
-from LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, implies
+from LLS_literal_manipulation import negate, variable_from_literal, implies
 
 def parse_input_string(input_string, indent = 0, verbosity = 0):
     """Transforms a "search pattern" given as a string into a SearchPattern"""
@@ -55,7 +55,7 @@ def parse_input_string(input_string, indent = 0, verbosity = 0):
 
     return grid, ignore_transition
 
-def make_rle(grid, rule = None, determined = None, indent = 0, verbosity = 0):
+def make_rle(grid, background_grid = None, rule = None, determined = None, show_background = None, indent = 0, verbosity = 0):
     """Turn a search pattern into nicely formatted string form"""
 
     print_message('Format: RLE', 3, indent = indent, verbosity = verbosity)
@@ -83,11 +83,26 @@ def make_rle(grid, rule = None, determined = None, indent = 0, verbosity = 0):
 
     rle_string += "$\n".join("".join(line)for line in grid[0])
 
-    rle_string += "!"
+    rle_string += "!\n"
 
     if not determined:
-        rle_string += "\n\nOther generations:\n"
-        rle_string += "\n\n".join("$\n".join("".join(line) for line in generation) for generation in grid[1:])
+        rle_string += "\nOther generations:\n"
+        rle_string += "\n\n".join("$\n".join("".join(line) for line in generation) for generation in grid[1:]) + "\n"
+
+    if show_background:
+        rle_string += "\nBackground:\n"
+        background_grid = copy.deepcopy(background_grid)
+
+        for t, generation in enumerate(background_grid):
+            for y, row in enumerate(generation):
+                for x, cell in enumerate(row):
+                    assert cell in ["0","1"], "Cell not equal to 0 or 1 in RLE format"
+                    if cell == "0":
+                        background_grid[t][y][x] = "b"
+                    elif cell == "1":
+                        background_grid[t][y][x] = "o"
+
+        rle_string += "\n\n".join("$\n".join("".join(line) for line in generation) for generation in background_grid) + "\n"
 
 
     return rle_string
@@ -95,7 +110,16 @@ def make_rle(grid, rule = None, determined = None, indent = 0, verbosity = 0):
 
 
 
-def make_csv(grid, ignore_transition = None, rule = None, determined = None, indent = 0, verbosity = 0):
+def make_csv(
+    grid,
+    ignore_transition = None,
+    background_grid = None,
+    background_ignore_transition = None,
+    rule = None,
+    determined = None,
+    show_background = None,
+    indent = 0, verbosity = 0
+):
     """Turn a search pattern in list form into nicely formatted csv string"""
 
     print_message('Format: csv', 3, indent = indent, verbosity = verbosity)
@@ -131,10 +155,39 @@ def make_csv(grid, ignore_transition = None, rule = None, determined = None, ind
     if rule != None:
         csv_string += "Rule = " + LLS_rules.rulestring_from_rule(rule) + "\n"
 
-    csv_string += "\n".join(",".join(line)for line in grid[0])
+    csv_string += "\n".join(",".join(line)for line in grid[0]) + "\n"
 
     if not determined:
-        csv_string += "\n\n" + "\n\n".join("\n".join(",".join(line) for line in generation) for generation in grid[1:])
+        csv_string += "\n" + "\n\n".join("\n".join(",".join(line) for line in generation) for generation in grid[1:]) + "\n"
+
+    if show_background:
+        csv_string += "\nBackground:\n"
+        background_grid = copy.deepcopy(background_grid)
+        if background_ignore_transition == None:
+            background_ignore_transition = [[[False for cell in row] for row in generation] for generation in background_grid]
+
+        lengths = []
+        for t, generation in enumerate(background_grid):
+            for y, row in enumerate(generation):
+                for x, cell in enumerate(row):
+                    if x != 0:
+                        lengths.append(len(cell) + background_ignore_transition[t][y][x-1])
+
+        length_first_column = max([max([
+                                        len(row[0])
+                              for row in generation]) for generation in background_grid])
+        if len(lengths) > 0:
+            length_other_columns = max(lengths)
+        for t, generation in enumerate(background_grid):
+            for y, row in enumerate(generation):
+                for x, cell in enumerate(row):
+                    if x == 0:
+                        background_grid[t][y][x] = " " * (length_first_column - len(cell)) +  cell
+                    else:
+                        background_grid[t][y][x] = " " * (length_other_columns - len(cell) - background_ignore_transition[t][y][x-1]) +  background_grid[t][y][x]
+                    if background_ignore_transition[t][y][x]:
+                        background_grid[t][y][x] += "'"
+        csv_string += "\n" + "\n\n".join("\n".join(",".join(line) for line in generation) for generation in background_grid) + "\n"
 
 
     return csv_string
