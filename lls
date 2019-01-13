@@ -71,7 +71,7 @@ parser.add_argument(
     nargs = "*",
     default = [],
     metavar = ("constraint", "GEN_0"),
-    help = """"Imposes a constraint on the population. Examples: "<10", ">=20", "=15". The population is measured in the first generation by default, or otherwise summed over all generations mentioned.""""
+    help = """"Imposes a constraint on the population. Examples: "<10", ">=20", "=15". The population is measured in the first generation by default, or otherwise summed over all generations mentioned."""
 )
 parser.add_argument(
     '-o', '--output_file_name',
