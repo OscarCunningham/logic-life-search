@@ -15,6 +15,9 @@ def LLS(
     population_at_most=[],
     population_at_least=[],
     population_exactly=[],
+    max_change = None,
+    max_decay = None,
+    max_growth = None,
     force_change=[],
     force_evolution=True,
     solver=None,
@@ -48,6 +51,9 @@ def LLS(
         population_at_most = population_at_most,
         population_at_least = population_at_least,
         population_exactly = population_exactly,
+        max_change = max_change,
+        max_decay = max_decay,
+        max_growth = max_growth,
         force_change = force_change,
         solver = solver,
         parameters = parameters,
@@ -140,6 +146,9 @@ def preprocess_and_solve(search_pattern,
     population_at_most=[],
     population_at_least=[],
     population_exactly=[],
+    max_change = None,
+    max_decay = None,
+    max_growth = None,
     force_change=[],
     force_evolution=True,
     solver=None,
@@ -160,6 +169,9 @@ def preprocess_and_solve(search_pattern,
             population_at_most = population_at_most,
             population_at_least = population_at_least,
             population_exactly = population_exactly,
+            max_change = max_change,
+            max_decay = max_decay,
+            max_growth = max_growth,
             force_change = force_change,
             method = method,
             indent = indent, verbosity = verbosity
@@ -270,6 +282,9 @@ def preprocess(
     population_at_most=[],
     population_at_least=[],
     population_exactly=[],
+    max_change = None,
+    max_decay = None,
+    max_growth = None,
     force_change=[],
     force_evolution=True,
     method=None,
@@ -304,6 +319,12 @@ def preprocess(
         search_pattern.force_population_at_least(constraint, indent = indent + 1, verbosity = verbosity)
     for constraint in population_exactly:
         search_pattern.force_population_exactly(constraint, indent = indent + 1, verbosity = verbosity)
+    if max_change != None:
+        search_pattern.force_max_change(max_change, indent = indent + 1, verbosity = verbosity)
+    if max_decay != None:
+        search_pattern.force_max_decay(max_decay, indent = indent + 1, verbosity = verbosity)
+    if max_growth != None:
+        search_pattern.force_max_growth(max_growth, indent = indent + 1, verbosity = verbosity)
     for times in force_change:
         search_pattern.force_change(times, indent = indent + 1, verbosity = verbosity)
 

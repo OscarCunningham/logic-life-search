@@ -171,6 +171,24 @@ parser.add_argument(
     default = None,
     help = """Specify a background offset"""
 )
+parser.add_argument(
+    '--max_change',
+    type = int,
+    default = None,
+    help = 'Maximum number of cells allowed to differ from how they are in the first generation'
+)
+parser.add_argument(
+    '--max_decay',
+    type = int,
+    default = None,
+    help = 'Maximum number of live cells allowed to differ from how they are in the first generation'
+)
+parser.add_argument(
+    '--max_growth',
+    type = int,
+    default = None,
+    help = 'Maximum number of dead cells allowed to differ from how they are in the first generation'
+)
 args = parser.parse_args()
 
 indent = 0
@@ -479,6 +497,9 @@ else:
         population_at_most = population_at_most,
         population_at_least = population_at_least,
         population_exactly = population_exactly,
+        max_change = args.max_change,
+        max_decay = args.max_decay,
+        max_growth = args.max_growth,
         force_change = force_change,
         force_evolution = True,
         solver = args.solver,

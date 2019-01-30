@@ -620,6 +620,91 @@ class SearchPattern:
             indent = indent, verbosity = verbosity
         )
 
+    def force_max_change(self, max_change, indent = 0, verbosity = 0):
+        print_message(
+            "Forcing the pattern to never change by more than " + str(max_change) + " cells",
+            3,
+            indent = indent, verbosity = verbosity
+        )
+        width = len(self.grid[0][0])
+        height = len(self.grid[0])
+        duration = len(self.grid)
+        for t in xrange(1,duration):
+            literals = []
+            for x in range(width):
+                for y in range(height):
+                    literal = str(t) + "_" + str(x) + "_" + str(y) + "_changes"
+                    self.clauses.append(implies([self.grid[t][y][x], negate(self.grid[0][y][x])],literal))
+                    self.clauses.append(implies([negate(self.grid[t][y][x]), self.grid[0][y][x]],literal))
+                    literals.append(literal)
+            print_message(
+                "Generation " + str(t),
+                3,
+                indent = indent+1, verbosity = verbosity
+            )
+            self.force_at_most(literals, max_change, indent = indent + 2, verbosity = verbosity)
+        print_message(
+            "Done\n",
+            3,
+            indent = indent, verbosity = verbosity
+        )
+
+    def force_max_decay(self, max_decay, indent = 0, verbosity = 0):
+        print_message(
+            "Forcing the pattern to never decay by more than " + str(max_decay) + " cells",
+            3,
+            indent = indent, verbosity = verbosity
+        )
+        width = len(self.grid[0][0])
+        height = len(self.grid[0])
+        duration = len(self.grid)
+        for t in xrange(1,duration):
+            literals = []
+            for x in range(width):
+                for y in range(height):
+                    literal = str(t) + "_" + str(x) + "_" + str(y) + "_decays"
+                    self.clauses.append(implies([negate(self.grid[t][y][x]), self.grid[0][y][x]],literal))
+                    literals.append(literal)
+            print_message(
+                "Generation " + str(t),
+                3,
+                indent = indent+1, verbosity = verbosity
+            )
+            self.force_at_most(literals, max_decay, indent = indent + 2, verbosity = verbosity)
+        print_message(
+            "Done\n",
+            3,
+            indent = indent, verbosity = verbosity
+        )
+
+    def force_max_growth(self, max_growth, indent = 0, verbosity = 0):
+        print_message(
+            "Forcing the pattern to never grow by more than " + str(max_growth) + " cells",
+            3,
+            indent = indent, verbosity = verbosity
+        )
+        width = len(self.grid[0][0])
+        height = len(self.grid[0])
+        duration = len(self.grid)
+        for t in xrange(1,duration):
+            literals = []
+            for x in range(width):
+                for y in range(height):
+                    literal = str(t) + "_" + str(x) + "_" + str(y) + "_grows"
+                    self.clauses.append(implies([self.grid[t][y][x], negate(self.grid[0][y][x])],literal))
+                    literals.append(literal)
+            print_message(
+                "Generation " + str(t),
+                3,
+                indent = indent+1, verbosity = verbosity
+            )
+            self.force_at_most(literals, max_growth, indent = indent + 2, verbosity = verbosity)
+        print_message(
+            "Done\n",
+            3,
+            indent = indent, verbosity = verbosity
+        )
+
     def force_equal(self, argument_0, argument_1 = None):
 
         if argument_1 != None:
