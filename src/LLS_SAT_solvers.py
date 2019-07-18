@@ -25,7 +25,8 @@ def SAT_solve(search_pattern, solver=None, parameters=None, timeout=None, save_d
         "glucose-syrup",
         "lingeling",
         "plingeling",
-        "treengeling"]
+        "treengeling",
+        "cadical"]
     try:
         if solver is None:
             solver = LLS_defaults.solver
@@ -89,7 +90,7 @@ def use_solver(solver, file_name, parameters = None, timeout = None, indent = 0,
 
     if solver in ["minisat","MapleCOMSPS","MapleCOMSPS_LRB","riss"]:
         command = [solver_path, file_name, "temp_SAT_solver_output"] + parameter_list
-    elif solver in ["lingeling","plingeling","treengeling"]:
+    elif solver in ["lingeling","plingeling","treengeling","cadical"]:
         command = [solver_path, file_name] + parameter_list
     elif solver in ["glucose", "glucose-syrup"]:
         command = [solver_path, file_name, "-model"] + parameter_list
@@ -131,7 +132,7 @@ def use_solver(solver, file_name, parameters = None, timeout = None, indent = 0,
             print_message('Removing SAT solver output file...', 3, indent = indent+1, verbosity = verbosity)
             os.remove("temp_SAT_solver_output")
             print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
-        elif solver in ["lingeling","plingeling","treengeling"]:
+        elif solver in ["lingeling","plingeling","treengeling","cadical"]:
             solution = out.split("\ns ")[1].split("\nc")[0].split("\nv ")
             solution = solution[0] + "\n" + " ".join(solution[1:])
         elif solver in ["glucose", "glucose-syrup"]:
