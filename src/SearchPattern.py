@@ -870,7 +870,7 @@ class SearchPattern:
                         if self.clauses.DIMACS_literal_from_variable.has_key(CNF_variable):
                             DIMACS_variable = self.clauses.DIMACS_literal_from_variable[CNF_variable]
 
-                            DIMACS_literal = negate(DIMACS_variable, negated)
+                            DIMACS_literal = negate(DIMACS_variable, negated, DIMACS = True)
 
                             if DIMACS_literal in solution:
                                 grid[t][y][x] = "1"
@@ -889,7 +889,7 @@ class SearchPattern:
                         if self.clauses.DIMACS_literal_from_variable.has_key(CNF_variable):
                             DIMACS_variable = self.clauses.DIMACS_literal_from_variable[CNF_variable]
 
-                            DIMACS_literal = negate(DIMACS_variable, negated)
+                            DIMACS_literal = negate(DIMACS_variable, negated, DIMACS = True)
 
                             if DIMACS_literal in solution:
                                 background_grid[t][y][x] = "1"
@@ -906,7 +906,7 @@ class SearchPattern:
                 if self.clauses.DIMACS_literal_from_variable.has_key(CNF_variable):
                     DIMACS_variable = self.clauses.DIMACS_literal_from_variable[CNF_variable]
 
-                    DIMACS_literal = negate(DIMACS_variable, negated)
+                    DIMACS_literal = negate(DIMACS_variable, negated, DIMACS = True)
 
                     if DIMACS_literal in solution:
                         rule[transition] = "1"
