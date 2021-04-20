@@ -1,4 +1,4 @@
-from LLS_literal_manipulation import negate, implies, neighbours_from_coordinates
+from src.LLS_literal_manipulation import negate, implies, neighbours_from_coordinates
 
 def children(letter, x, y):
     """Gives the indices of the "children" of the variables describing the neighbours of a cell, according to the scheme described by Knuth"""

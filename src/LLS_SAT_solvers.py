@@ -5,9 +5,9 @@ import os
 import errno
 import sys
 import re
-import LLS_files
-import LLS_defaults
-from LLS_messages import print_message
+import src.LLS_files as LLS_files
+import src.LLS_defaults as LLS_defaults
+from src.LLS_messages import print_message
 
 
 def SAT_solve(search_pattern, solver=None, parameters=None, timeout=None, save_dimacs = None, dry_run = None, indent = 0, verbosity = 0):
@@ -38,7 +38,7 @@ def SAT_solve(search_pattern, solver=None, parameters=None, timeout=None, save_d
 
     assert solver in solvers, "Solver not found"
 
-    if isinstance(save_dimacs, basestring):
+    if isinstance(save_dimacs, str):
         dimacs_file = save_dimacs
     else:
         dimacs_file = "lls_dimacs.cnf"
@@ -116,6 +116,8 @@ def use_solver(solver, file_name, parameters = None, timeout = None, indent = 0,
         start_time = time.time()
         timeout_timer.start()
         out, error = solver_process.communicate()
+        out = out.decode("utf-8")
+        error = error.decode("utf-8")
     except KeyboardInterrupt:
         solver_process.kill()
         timeout_flag[0] = "SIGINT"
@@ -134,7 +136,12 @@ def use_solver(solver, file_name, parameters = None, timeout = None, indent = 0,
             os.remove("temp_SAT_solver_output")
             print_message('Done\n', 3, indent = indent + 1, verbosity = verbosity)
         elif solver in ["lingeling","plingeling","treengeling","cadical","kissat"]:
-            solution = out.split("\ns ")[1].split("\nc")[0].split("\nv ")
+            solution = str(out)
+            solution = solution.split("\ns ")
+            solution = solution[1]
+            solution = solution.split("\nc")
+            solution = solution[0]
+            solution = solution.split("\nv ")
             solution = solution[0] + "\n" + " ".join(solution[1:])
         elif solver in ["glucose", "glucose-syrup"]:
             try:

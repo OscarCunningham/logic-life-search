@@ -1,11 +1,11 @@
 import os
-import LLS_files
-import LLS_formatting
-import LLS_SAT_solvers
-import LLS_defaults
-from UnsatInPreprocessing import UnsatInPreprocessing
-from LLS_messages import print_message
-from LLS_literal_manipulation import negate
+import src.LLS_files as LLS_files
+import src.LLS_formatting as LLS_formatting
+import src.LLS_SAT_solvers as LLS_SAT_solvers
+import src.LLS_defaults as LLS_defaults
+from src.UnsatInPreprocessing import UnsatInPreprocessing
+from src.LLS_messages import print_message
+from src.LLS_literal_manipulation import negate
 
 
 def LLS(

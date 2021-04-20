@@ -1,8 +1,8 @@
 import re
 import ast
-import LLS_formatting
-from LLS_literal_manipulation import variable_from_literal, negate
-from LLS_messages import print_message
+import src.LLS_formatting as LLS_formatting
+from src.LLS_literal_manipulation import variable_from_literal, negate
+from src.LLS_messages import print_message
 
 
 possible_transitions = {"0":sorted("c"),
@@ -190,7 +190,7 @@ def rule_from_rulestring(rulestring, indent = 0, verbosity = 0):
 
 
             for number_of_neighbours in "012345678":
-                if not rule.has_key(BS_letter + number_of_neighbours + "c"):
+                if BS_letter + number_of_neighbours + "c" not in rule:
                     for character in possible_transitions[number_of_neighbours]:
                          rule[BS_letter + number_of_neighbours + character] = "0"
 

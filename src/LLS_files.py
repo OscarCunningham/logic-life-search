@@ -1,6 +1,5 @@
 import pickle
-from LLS_messages import print_message
-
+from src.LLS_messages import print_message
 
 def string_from_file(file_name, indent=0, verbosity=0):
     """Read file into string"""

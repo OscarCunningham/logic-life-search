@@ -8,4 +8,4 @@ def print_message(message, needed_verbosity=2, indent=0, verbosity=0):
         # Split on newline, carriage return or both
         lines = re.split("(?:\n|\r|(?:\r\n))", message)
         for line in lines:
-            print ("    " * indent) + line
+            print(("    " * indent) + line)

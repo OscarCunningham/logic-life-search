@@ -1,16 +1,16 @@
 import collections
 import copy
 import itertools
-import LLS_taocp_variable_scheme
-import LLS_formatting
-import LLS_rules
-import LLS_defaults
-import LLS_files
-import LLS_literal_manipulation
-from ClauseList import ClauseList
-from UnsatInPreprocessing import UnsatInPreprocessing
-from LLS_messages import print_message
-from LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, implies
+import src.LLS_taocp_variable_scheme as LLS_taocp_variable_scheme
+import src.LLS_formatting as LLS_formatting
+import src.LLS_rules as LLS_rules
+import src.LLS_defaults as LLS_defaults
+import src.LLS_files as LLS_files
+import src.LLS_literal_manipulation as LLS_literal_manipulation
+from src.ClauseList import ClauseList
+from src.UnsatInPreprocessing import UnsatInPreprocessing
+from src.LLS_messages import print_message
+from src.LLS_literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, implies
 
 class SearchPattern:
 
@@ -62,20 +62,20 @@ class SearchPattern:
 
             # Surround the grid by one cell from the background, and offset the background accodingly
             LLS_literal_manipulation.offset_background(self.background_grid,1,1,0)
-            new_grid = [[["0" for x in xrange(width + 2)] for y in xrange(height + 2)] for t in xrange(duration)]
-            for x in xrange(width + 2):
-                for y in xrange(height + 2):
-                    for t in xrange(duration):
+            new_grid = [[["0" for x in range(width + 2)] for y in range(height + 2)] for t in range(duration)]
+            for x in range(width + 2):
+                for y in range(height + 2):
+                    for t in range(duration):
                         if x in range(1, width + 1) and y in range(1, height + 1):
                             new_grid[t][y][x] = self.grid[t][y - 1][x - 1]
                         else:
                             new_grid[t][y][x] = self.background_grid[t % background_duration][y % background_height][x % background_width]
             self.grid = new_grid
             LLS_literal_manipulation.offset_background(self.background_ignore_transition,1,1,0)
-            new_ignore_transition = [[["0" for x in xrange(width + 2)] for y in xrange(height + 2)] for t in xrange(duration)]
-            for x in xrange(width + 2):
-                for y in xrange(height + 2):
-                    for t in xrange(duration):
+            new_ignore_transition = [[["0" for x in range(width + 2)] for y in range(height + 2)] for t in range(duration)]
+            for x in range(width + 2):
+                for y in range(height + 2):
+                    for t in range(duration):
                         if x in range(1, width + 1) and y in range(1, height + 1):
                             new_ignore_transition[t][y][x] = self.ignore_transition[t][y - 1][x - 1]
                         else:
@@ -117,7 +117,7 @@ class SearchPattern:
                         current_variable_number += 1
                     elif cell not in ["0","1"]:
                         (variable, negated) = variable_from_literal(cell)
-                        if not standard_variables_from_input_variables.has_key(variable):
+                        if variable not in standard_variables_from_input_variables:
                             standard_variables_from_input_variables[variable] = negate("c" + str(current_variable_number),negated)
                             current_variable_number += 1
                         self.background_grid[t][y][x] = negate(standard_variables_from_input_variables[variable],negated)
@@ -129,7 +129,7 @@ class SearchPattern:
                         current_variable_number += 1
                     elif cell not in ["0","1"]:
                         (variable, negated) = variable_from_literal(cell)
-                        if not standard_variables_from_input_variables.has_key(variable):
+                        if variable not in standard_variables_from_input_variables:
                             standard_variables_from_input_variables[variable] = negate("c" + str(current_variable_number),negated)
                             current_variable_number += 1
                         self.grid[t][y][x] = negate(standard_variables_from_input_variables[variable],negated)
@@ -137,7 +137,7 @@ class SearchPattern:
         for transition, literal in self.rule.items():
             if literal not in ["0", "1"]:
                 (variable, negated) = variable_from_literal(literal)
-                if not standard_variables_from_input_variables.has_key(variable):
+                if variable not in standard_variables_from_input_variables:
                     standard_variables_from_input_variables[variable] = negate("c" + str(current_variable_number),negated)
                     current_variable_number += 1
                 self.rule[transition] = negate(standard_variables_from_input_variables[variable],negated)
@@ -160,7 +160,7 @@ class SearchPattern:
                     if not self.background_ignore_transition[t][y][x]:
                         parents = [predecessor_cell] + list(LLS_rules.sort_neighbours(neighbours))
                         parents_string = str(parents)
-                        if parents_dict.has_key(parents_string):
+                        if parents_string in parents_dict:
                             self.background_grid[t][y][x] = parents_dict[parents_string]
                             to_force_equal.append((parents_dict[parents_string],cell))
                             self.background_ignore_transition[t][y][x] = True
@@ -187,7 +187,7 @@ class SearchPattern:
                         if not self.ignore_transition[t][y][x]:
                             parents = [predecessor_cell] + list(LLS_rules.sort_neighbours(neighbours))
                             parents_string = str(parents)
-                            if parents_dict.has_key(parents_string):
+                            if parents_string in parents_dict:
                                 self.grid[t][y][x] = parents_dict[parents_string]
                                 to_force_equal.append((parents_dict[parents_string],cell))
                                 self.ignore_transition[t][y][x] = True
@@ -223,13 +223,13 @@ class SearchPattern:
 
             # If any seven neighbours were dead, the cell is dead
             for seven_neighbours in itertools.combinations(neighbours, 7):
-                clause = implies(map(negate,seven_neighbours), negate(cell))
+                clause = implies([negate(neighbour) for neighbour in seven_neighbours], negate(cell))
                 self.clauses.append(clause)
 
             # If the cell was dead, and any six neighbours were
             # dead, the cell is dead
             for six_neighbours in itertools.combinations(neighbours, 6):
-                clause = implies([negate(predecessor_cell)] + map(negate,six_neighbours), negate(cell))
+                clause = implies([negate(predecessor_cell)] + [negate(neighbour) for neighbour in six_neighbours], negate(cell))
                 self.clauses.append(clause)
 
             # If three neighbours were alive and five were dead,
@@ -239,7 +239,7 @@ class SearchPattern:
                 neighbours_counter.subtract(three_neighbours)
                 three_neighbours, five_neighbours = list(three_neighbours), list(neighbours_counter.elements())
 
-                clause = implies(three_neighbours + map(negate, five_neighbours), cell)
+                clause = implies(three_neighbours + [negate(neighbour) for neighbour in five_neighbours], cell)
                 self.clauses.append(clause)
 
             # Finally, if the cell was live, and two neighbours
@@ -250,7 +250,7 @@ class SearchPattern:
                 neighbours_counter.subtract(two_neighbours)
                 two_neighbours, five_neighbours = list(two_neighbours), list(neighbours_counter.elements())[1:]
 
-                clause = implies([predecessor_cell] + two_neighbours + map(negate, five_neighbours), cell)
+                clause = implies([predecessor_cell] + two_neighbours + [negate(neighbour) for neighbour in five_neighbours], cell)
                 self.clauses.append(clause)
 
         elif method == 2:
@@ -268,8 +268,8 @@ class SearchPattern:
                     transition = LLS_rules.transition_from_cells(neighbours_alive)
                     transition_literal = self.rule[BS_letter + transition]
 
-                    self.clauses.append(implies([transition_literal] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), cell))
-                    self.clauses.append(implies([negate(transition_literal)] + [negate(predecessor_cell, not predecessor_cell_alive)] + map(negate, neighbours, map(lambda P: not P, neighbours_alive)), negate(cell)))
+                    self.clauses.append(implies([transition_literal] + [negate(predecessor_cell, not predecessor_cell_alive)] + list(map(negate, neighbours, map(lambda P: not P, neighbours_alive))), cell))
+                    self.clauses.append(implies([negate(transition_literal)] + [negate(predecessor_cell, not predecessor_cell_alive)] + list(map(negate, neighbours, map(lambda P: not P, neighbours_alive))), negate(cell)))
 
     def force_evolution(self, method=None, indent = 0, verbosity = 0):
         """Adds clauses that force the search pattern to obey the transition rule"""
@@ -325,7 +325,7 @@ class SearchPattern:
         width = len(self.grid[0][0])
         height = len(self.grid[0])
 
-        self.force_unequal([(self.grid[t_0][y][x],self.grid[t_1][y][x]) for x in xrange(width) for y in xrange(height)])
+        self.force_unequal([(self.grid[t_0][y][x],self.grid[t_1][y][x]) for x in range(width) for y in range(height)])
 
         print_message(
             "Number of clauses used: " + str(len(self.clauses.clause_set) - starting_number_of_clauses),
@@ -403,7 +403,7 @@ class SearchPattern:
             already_defined.append(name)
 
             max_literals = len(literals_copy) #The most literals that could be true
-            max_literals_1 = max_literals/2
+            max_literals_1 = max_literals//2
             literals_1 = literals_copy[:max_literals_1]
             variables_to_define_1 = []  # A list of variables we need to define
             max_literals_2 = max_literals - max_literals_1
@@ -530,9 +530,9 @@ class SearchPattern:
 
         cell_pairs = []
 
-        for x in xrange(width):
-            for y in xrange(height):
-                for t in xrange(duration):
+        for x in range(width):
+            for y in range(height):
+                for t in range(duration):
                     cell = self.grid[t][y][x]
                     if t < duration - period:
                         other_x, other_y = f(x,y)
@@ -629,7 +629,7 @@ class SearchPattern:
         width = len(self.grid[0][0])
         height = len(self.grid[0])
         duration = len(self.grid)
-        for t in xrange(1,duration):
+        for t in range(1,duration):
             literals = []
             for x in range(width):
                 for y in range(height):
@@ -658,7 +658,7 @@ class SearchPattern:
         width = len(self.grid[0][0])
         height = len(self.grid[0])
         duration = len(self.grid)
-        for t in xrange(1,duration):
+        for t in range(1,duration):
             literals = []
             for x in range(width):
                 for y in range(height):
@@ -686,7 +686,7 @@ class SearchPattern:
         width = len(self.grid[0][0])
         height = len(self.grid[0])
         duration = len(self.grid)
-        for t in xrange(1,duration):
+        for t in range(1,duration):
             literals = []
             for x in range(width):
                 for y in range(height):
@@ -712,7 +712,7 @@ class SearchPattern:
             cell_pair_list = [(argument_0, argument_1)]
         elif argument_0 == []:
             return
-        elif isinstance(argument_0[0], basestring):
+        elif isinstance(argument_0[0], str):
                 assert len(argument_0) == 2 and isinstance(argument_0[1], basestring), "force_equal arguments not understood"
                 cell_pair_list = [argument_0]
         else:
@@ -725,13 +725,13 @@ class SearchPattern:
         for cell_0, cell_1 in cell_pair_list:
             while cell_0 not in ["0", "1"]:
                 variable_0, negated_0 = variable_from_literal(cell_0)
-                if replacement.has_key(variable_0):
+                if variable_0 in replacement:
                     cell_0 = negate(replacement[variable_0], negated_0)
                 else:
                     break
             while cell_1 not in ["0", "1"]:
                 variable_1, negated_1 = variable_from_literal(cell_1)
-                if replacement.has_key(variable_1):
+                if variable_1 in replacement:
                     cell_1 = negate(replacement[variable_1], negated_1)
                 else:
                     break
@@ -746,10 +746,10 @@ class SearchPattern:
 
                 if cell_1 not in ["0", "1"]:
                     variable_1, negated_1 = variable_from_literal(cell_1)
-                    if not replaces.has_key(variable_1):
+                    if not variable_1 in replaces:
                         replaces[variable_1] = []
 
-                if replaces.has_key(variable_0):
+                if variable_0 in replaces:
                     for variable in replaces[variable_0]:
                         replacement_variable, replacement_negated = variable_from_literal(replacement[variable])
                         replacement[variable] = negate(cell_1, replacement_negated)
@@ -766,7 +766,7 @@ class SearchPattern:
                 for x, cell in enumerate(row):
                     if cell not in ["0", "1"]:
                         variable, negated = variable_from_literal(cell)
-                        if replacement.has_key(variable):
+                        if variable in replacement:
                             if replacement[variable] != variable:
                                 self.grid[t][y][x] = negate(replacement[variable], negated)
 
@@ -775,25 +775,25 @@ class SearchPattern:
                 for x, cell in enumerate(row):
                     if cell not in ["0", "1"]:
                         variable, negated = variable_from_literal(cell)
-                        if replacement.has_key(variable):
+                        if variable in replacement:
                             if replacement[variable] != variable:
                                 self.background_grid[t][y][x] = negate(replacement[variable], negated)
 
         for transition, literal in self.rule.items():
             if literal not in ["0", "1"]:
                 variable, negated = variable_from_literal(literal)
-                if replacement.has_key(variable):
+                if variable in replacement:
                     if replacement[variable] != variable:
                         self.rule[transition] = negate(replacement[variable], negated)
 
     def force_unequal(self, argument_0, argument_1 = None):
         if argument_1 != None:
-            assert isinstance(argument_0, basestring) and isinstance(argument_1, basestring), "force_equal arguments not understood"
+            assert isinstance(argument_0, str) and isinstance(argument_1, str), "force_equal arguments not understood"
             cell_pair_list = [(argument_0, argument_1)]
         elif argument_0 == []:
             return
-        elif isinstance(argument_0[0], basestring):
-                assert len(argument_0) == 2 and isinstance(argument_0[1], basestring), "force_equal arguments not understood"
+        elif isinstance(argument_0[0], str):
+                assert len(argument_0) == 2 and isinstance(argument_0[1], str), "force_equal arguments not understood"
                 cell_pair_list = [argument_0]
         else:
             cell_pair_list = argument_0
@@ -867,10 +867,10 @@ class SearchPattern:
                         pass
                     else:
                         (CNF_variable, negated) = variable_from_literal(cell)
-                        if self.clauses.DIMACS_literal_from_variable.has_key(CNF_variable):
+                        if CNF_variable in self.clauses.DIMACS_literal_from_variable:
                             DIMACS_variable = self.clauses.DIMACS_literal_from_variable[CNF_variable]
 
-                            DIMACS_literal = negate(DIMACS_variable, negated)
+                            DIMACS_literal = negate(DIMACS_variable, negated, DIMACS = True)
 
                             if DIMACS_literal in solution:
                                 grid[t][y][x] = "1"
@@ -886,10 +886,10 @@ class SearchPattern:
                         pass
                     else:
                         (CNF_variable, negated) = variable_from_literal(cell)
-                        if self.clauses.DIMACS_literal_from_variable.has_key(CNF_variable):
+                        if CNF_variable in self.clauses.DIMACS_literal_from_variable:
                             DIMACS_variable = self.clauses.DIMACS_literal_from_variable[CNF_variable]
 
-                            DIMACS_literal = negate(DIMACS_variable, negated)
+                            DIMACS_literal = negate(DIMACS_variable, negated, DIMACS = True)
 
                             if DIMACS_literal in solution:
                                 background_grid[t][y][x] = "1"
@@ -903,10 +903,10 @@ class SearchPattern:
                 pass
             else:
                 (CNF_variable, negated) = variable_from_literal(literal)
-                if self.clauses.DIMACS_literal_from_variable.has_key(CNF_variable):
+                if CNF_variable in self.clauses.DIMACS_literal_from_variable:
                     DIMACS_variable = self.clauses.DIMACS_literal_from_variable[CNF_variable]
 
-                    DIMACS_literal = negate(DIMACS_variable, negated)
+                    DIMACS_literal = negate(DIMACS_variable, negated, DIMACS = True)
 
                     if DIMACS_literal in solution:
                         rule[transition] = "1"

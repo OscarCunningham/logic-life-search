@@ -1,5 +1,5 @@
-from LLS_messages import print_message
-from LLS_literal_manipulation import negate, variable_from_literal
+from src.LLS_messages import print_message
+from src.LLS_literal_manipulation import negate, variable_from_literal
 
 class ClauseList:
 
@@ -32,7 +32,7 @@ class ClauseList:
             else:
                 (variable, negated) = variable_from_literal(literal)
                 # If we haven't seen it before then add it to the dictionary
-                if not self.DIMACS_literal_from_variable.has_key(variable):
+                if variable not in self.DIMACS_literal_from_variable:
                     self.DIMACS_literal_from_variable[variable] = str(self.number_of_variables + 1)
                     self.number_of_variables += 1
                 elif negate(literal) in clause:

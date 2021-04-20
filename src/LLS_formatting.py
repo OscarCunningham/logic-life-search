@@ -1,14 +1,13 @@
 import re
 import copy
-import LLS_rules
-from LLS_messages import print_message
-from LLS_literal_manipulation import negate, variable_from_literal, implies
+import src.LLS_rules as LLS_rules
+from src.LLS_messages import print_message
+from src.LLS_literal_manipulation import negate, variable_from_literal, implies
 
 def parse_input_string(input_string, indent = 0, verbosity = 0):
     """Transforms a "search pattern" given as a string into a SearchPattern"""
 
     print_message("Parsing input pattern...", 3, indent = indent, verbosity = verbosity)
-
     # Remove any trailing (or leading) whitespace and commas
     input_string = input_string.strip(", \t\n\f\v")
 
@@ -21,7 +20,7 @@ def parse_input_string(input_string, indent = 0, verbosity = 0):
     split_by_line = [re.split("[ ,\t]*(?:\n)[ ,\t]*", # Split on signle newline and any ammount of commas or spaces
                      generation)
                      for generation in split_by_generation]
-    grid = [[re.split("[ ,\t]*",  # Split on any amount of commas or spaces
+    grid = [[re.split("[ ,\t]+",  # Split on any amount of commas or spaces
                     line)
                     for line in generation]
                     for generation in split_by_line]
@@ -34,7 +33,6 @@ def parse_input_string(input_string, indent = 0, verbosity = 0):
                len(line) == len(grid[0][0])
                for line in generation) for generation in grid)), \
            "Search pattern is not cuboidal"
-
     # Tidy up any weird inputs
     grid = [[[standard_form_literal(cell)
                       for cell in row] for row in generation] for generation in grid]

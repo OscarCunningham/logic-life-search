@@ -1,4 +1,4 @@
-#! /usr/bin/python2
+#! /usr/bin/python
 
 """Handles the command line input and passes it to LLS_main"""
 
@@ -191,6 +191,8 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
+lls_dir = os.path.dirname(os.path.realpath(__file__))
+
 indent = 0
 verbosity = args.verbosity
 
@@ -368,9 +370,10 @@ else:
                 args.background[0],
                 indent = indent + 2, verbosity = verbosity
             )
-        elif os.path.isfile("backgrounds/" + args.background[0]):
-            input_string = src.LLS_files.string_from_file(
-                "backgrounds/" + args.background[0],
+        elif os.path.isfile(lls_dir +
+                "/backgrounds/" + args.background[0]):
+            input_string = src.LLS_files.string_from_file(lls_dir +
+                "/backgrounds/" + args.background[0],
                 indent = indent + 2, verbosity = verbosity
             )
         else:
@@ -385,8 +388,8 @@ else:
             background_grid,
             background_ignore_transition
         ) = src.LLS_search_patterns.search_pattern_from_string(
-            src.LLS_files.string_from_file(
-                "backgrounds/" + src.LLS_defaults.background,
+            src.LLS_files.string_from_file(lls_dir +
+                "/backgrounds/" + src.LLS_defaults.background,
             )
         )
 
@@ -407,9 +410,9 @@ else:
                 args.input_file_name,
                 indent = indent + 2, verbosity = verbosity
             )
-        elif os.path.isfile("search_patterns/" + args.input_file_name):
+        elif os.path.isfile(lls_dir + "/search_patterns/" + args.input_file_name):
             input_string = src.LLS_files.string_from_file(
-                "search_patterns/" + args.input_file_name,
+                lls_dir + "/search_patterns/" + args.input_file_name,
                 indent = indent + 2, verbosity = verbosity
             )
         else:
@@ -439,8 +442,8 @@ else:
     if args.check_orphan:
         if os.path.isfile(args.check_orphan[0]):
             file_name = args.check_orphan[0]
-        elif os.path.isfile("search_patterns/" + args.check_orphan[0]):
-            file_name = "search_patterns/" + args.check_orphan[0]
+        elif os.path.isfile(lls_dir + "/search_patterns/" + args.check_orphan[0]):
+            file_name = lls_dir + "/search_patterns/" + args.check_orphan[0]
         else:
             assert False, "Search pattern file not found"
         if len(args.check_orphan) == 2:
@@ -452,8 +455,8 @@ else:
     if args.stator:
         if os.path.isfile(args.stator[0]):
             file_name = args.stator[0]
-        elif os.path.isfile("search_patterns/" + args.stator[0]):
-            file_name = "search_patterns/" + args.stator[0]
+        elif os.path.isfile(lls_dir + "/search_patterns/" + args.stator[0]):
+            file_name = lls_dir + "/search_patterns/" + args.stator[0]
         else:
             assert False, "Search pattern file not found"
         grid, _ = src.LLS_formatting.parse_input_string(
