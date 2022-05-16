@@ -1,4 +1,4 @@
-from src.messages import print_message
+from src.logging import log
 from src.literal_manipulation import negate, variable_from_literal
 
 
@@ -43,14 +43,15 @@ class ClauseList:
         dimacs_clause.append("0\n")
         self.clause_set.add(" ".join(dimacs_clause))
 
-    def make_file(self, file_name, indent=0):
+    def make_file(self, file_name):
         output_string = self.make_string()
-        print_message('Writing file "' + file_name + '" ...', 3, indent=indent)
+        log('Writing file "' + file_name + '" ...',1)
         with open(file_name, "w") as output_file:
             output_file.write(output_string)
-        print_message('Done\n', 3, indent=indent)
+        log('Done\n', -1)
 
-    def make_string(self, indent=0):
-        print_message('Writing clauses into DIMACS format ...', 3, indent=indent)
-        return "p cnf " + str(self.number_of_variables) + " " + str(len(self.clause_set)) + "\n" + "".join(self.clause_set)
-        print_message('Done\n', 3, indent=indent)
+    def make_string(self):
+        log('Writing clauses into DIMACS format ...', 1)
+        dimacs = "p cnf " + str(self.number_of_variables) + " " + str(len(self.clause_set)) + "\n" + "".join(self.clause_set)
+        log('Done\n', -1)
+        return dimacs

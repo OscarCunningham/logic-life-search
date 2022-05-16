@@ -1,17 +1,18 @@
 import src.files
 import src.formatting
 import src.rules
-import src.defaults
-from src.messages import print_message
+from src.logging import log
 from src.utilities import make_grid
 from src.literal_manipulation import variable_from_literal, negate
 
 
-def search_pattern_from_string(input_string, indent=0):
+def search_pattern_from_string(input_string):
     """Create the grid and ignore_transition of a search pattern from the given string"""
-    grid, ignore_transition = src.formatting.parse_input_string(input_string, indent=indent)
+    grid, ignore_transition = src.formatting.parse_input_string(input_string)
 
-    print_message("Pattern parsed as:\n" + src.formatting.make_csv(grid, ignore_transition) + "\n", 3, indent=indent)
+    log("Pattern parsed as:",1)
+    log(src.formatting.make_csv(grid, ignore_transition))
+    log('Done\n',-1)
 
     for t, generation in enumerate(grid):
         for y, row in enumerate(generation):
@@ -23,11 +24,11 @@ def search_pattern_from_string(input_string, indent=0):
     return grid, ignore_transition
 
 
-def blank_search_pattern(width, height, duration, indent=0):
-    print_message('Creating spaceship search pattern...', 3, indent=indent)
+def blank_search_pattern(width, height, duration):
+    log('Creating spaceship search pattern...', 1)
 
     grid = make_grid('*', width, height, duration)
 
-    print_message("Pattern created:\n" + src.formatting.make_csv(grid) + "\n", 3, indent=indent + 1)
-    print_message('Done\n', 3, indent=indent)
+    log("Pattern created:\n" + src.formatting.make_csv(grid) + "\n")
+    log('Done\n', -1)
     return grid

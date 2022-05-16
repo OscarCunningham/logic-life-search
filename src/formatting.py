@@ -1,15 +1,15 @@
 import re
 import copy
 from src.rules import rulestring_from_rule
-from src.messages import print_message
+from src.logging import log
 from src.utilities import format_carriage_returns, make_grid
 from src.literal_manipulation import standard_form_literal
 
 
-def parse_input_string(input_string, indent=0):
+def parse_input_string(input_string):
     """Parses a search pattern given as a string"""
 
-    print_message("Parsing input pattern...", 3, indent=indent)
+    log("Parsing input pattern...", 1)
 
     input_string = format_carriage_returns(input_string)
 
@@ -55,15 +55,15 @@ def parse_input_string(input_string, indent=0):
     grid = [[[cell.rstrip("'’")  # The "'"s are now unnecessary
               for cell in row] for row in generation] for generation in grid]
 
-    print_message("Done\n", 3, indent=indent)
+    log("Done\n", -1)
 
     return grid, ignore_transition
 
 
-def make_rle(grid, background_grid=None, rule=None, determined=None, show_background=None, indent=0):
+def make_rle(grid, background_grid=None, rule=None, determined=None, show_background=None):
     """Turn a search pattern into nicely formatted string form"""
 
-    print_message('Format: RLE', 3, indent=indent)
+    log('Format: RLE')
 
     grid = copy.deepcopy(grid)
 
@@ -120,12 +120,11 @@ def make_csv(
         background_ignore_transition=None,
         rule=None,
         determined=None,
-        show_background=None,
-        indent=0
+        show_background=None
 ):
     """Turn a search pattern in list form into nicely formatted csv string"""
 
-    print_message('Format: csv', 3, indent=indent)
+    log('Format: csv')
 
     grid = space_evenly(grid, ignore_transition)
 

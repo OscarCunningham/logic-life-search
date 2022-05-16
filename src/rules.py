@@ -1,7 +1,7 @@
 import re
 import ast
 from src.literal_manipulation import variable_from_literal, standard_form_literal
-from src.messages import print_message
+from src.logging import log
 
 possible_transitions = {"0": sorted("c"),
                         "1": sorted("ce"),
@@ -67,7 +67,7 @@ transition_lookup = {
     "11111111": "8c"}
 
 
-def rule_from_rulestring(rulestring, indent=0):
+def rule_from_rulestring(rulestring):
     if rulestring is None:
         return None
     else:
@@ -197,7 +197,7 @@ def rule_from_rulestring(rulestring, indent=0):
 
         new_rulestring = rulestring_from_rule(rule)
         if original_rulestring != new_rulestring:
-            print_message("Rulestring parsed as: " + new_rulestring, 3, indent=indent)
+            log("Rulestring parsed as: " + new_rulestring)
 
         return rule
 

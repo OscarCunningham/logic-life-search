@@ -1,21 +1,20 @@
 #! /usr/bin/env python3
 
-"""Handles the command line input and passes it to LLS_main"""
-
 import argparse
 import sys
 import os
 import re
-import src.main
 import src.search_patterns
 import src.rules
 import src.files
-import src.defaults
+import settings
 import src.literal_manipulation
-import src.formatting
+import src.logging
 from src.SearchPattern import SearchPattern
 from src.literal_manipulation import negate, variable_from_literal
-from src.messages import print_message
+from src.logging import log
+from src.sat_solvers import Status, sat_solve
+from src.UnsatInPreprocessing import UnsatInPreprocessing
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -32,18 +31,7 @@ parser.add_argument(
     default=None,
     help="""Creates a blank_search_pattern with size BOUND_1 by BOUND_2, and duration BOUND_3. If BOUND_3 isn't present, assume duration is period + 1. If BOUND_2 isn't present, assume bounding box is square."""
 )
-parser.add_argument(
-    '--check_orphan',
-    nargs="+",
-    default=None,
-    help='''Creates a search pattern to check if the pattern in the given file is an orphan. Extra numerical argument to check several generations back. The file format is "1" for alive, "0" for dead, "*" for don't-care'''
-)
-parser.add_argument(
-    '--stator',
-    nargs="+",
-    default=None,
-    help='''Creates a search pattern for the stator of the oscillator in the given file'''
-)
+
 parser.add_argument(
     '-s', '--symmetry',
     nargs="*",
@@ -111,14 +99,15 @@ parser.add_argument(
 parser.add_argument(
     '-v', '--verbosity',
     type=int,
-    default=src.defaults.verbosity,
+    default=settings.verbosity,
     help="""Set the verbosity. Options: 0 - No output. Only useful with -o option to save solution to file. 1 - Only display the solution. 2 (Default) - Displays some information about what the program is doing, some statistics, and the solution. 3 - A huge torrent of information."""
 )
 parser.add_argument(
     "-n", "--number_of_solutions",
+    type=int,
     nargs="?",
-    default=None,
-    const="Infinity",
+    default=1,
+    const=float('inf'),
     help="Number of solutions to find, or (if no number is given) all of them."
 )
 parser.add_argument(
@@ -194,311 +183,302 @@ args = parser.parse_args()
 
 lls_dir = os.path.dirname(os.path.realpath(__file__))
 
-indent = 0
-src.defaults.verbosity = args.verbosity
-
-print_message('', indent=indent)
+src.logging.verbosity_level = args.verbosity
 
 if args.version:
-    print_message('Version 2\n', 1, indent=indent)
+    log('Version 3\n', 0, 1)
 pattern_output_format = args.csv
 output_file_name = args.output_file_name
 
-if args.substitute_solution:
-    # Solution has already been found and we just have to sub it back in
-    (
-        grid,
-        ignore_transition,
-        background_grid,
-        background_ignore_transition,
-        rule,
-        DIMACS_literal_from_variable
-    ) = src.files.object_from_file(
-        args.substitute_solution[0],
-        indent=indent
-    )
-    solution = src.files.string_from_file(args.substitute_solution[1], indent=indent)
-    solution = re.sub("v ", "", re.sub("s ", "", solution))
-    search_pattern = SearchPattern(
-        grid,
-        ignore_transition=ignore_transition,
-        background_grid=background_grid,
-        background_ignore_transition=background_ignore_transition,
-        rule=rule,
-        add_border=False
-    )
-    search_pattern.clauses.DIMACS_literal_from_variable = DIMACS_literal_from_variable
-    solution = search_pattern.substitute_solution(
-        solution,
-        indent=indent
-    )
-    output_string = solution.make_string(
-        pattern_output_format=pattern_output_format,
-        determined=search_pattern.deterministic(),
-        indent=indent
-    )
-    print_message(output_string + "\n", 1, indent=indent)
-    if output_file_name:
-        print_message('Writing to output file...', indent=indent)
-        src.files.append_to_file_from_string(output_file_name, output_string, indent=indent + 1)
-        print_message('Done\n', indent=indent)
+log('Getting search pattern...', 1, 2)
 
-else:
-    print_message('Getting search pattern...', indent=indent)
 
-    force_change = []
-    for generations in args.force_change:
-        assert len(generations) in [0, 2], "Wrong number of arguments to -c"
-        if len(generations) == 0:
-            force_change.append([0, 1])
-        elif len(generations) == 2:
-            force_change.append(generations)
 
-    population_at_most = []
-    population_at_least = []
-    population_exactly = []
-    for arguments in args.population:
-        if len(arguments) == 0:
-            population_at_least.append([[0], 1])
-        else:
-            constraint = arguments[0]
-            times = [int(t) for t in arguments[1:]] if len(arguments) > 1 else [0]
-            re_match = re.match("(^.*?)([0-9]*$)", constraint)
-            sign = re_match.group(1)
-            amount = int(re_match.group(2))
-            if sign in ["", "="]:
-                population_exactly.append([times, amount])
-            elif sign in ["<=", "=<"]:
-                population_at_most.append([times, amount])
-            elif sign in [">=", "=>"]:
-                population_at_least.append([times, amount])
-            elif sign == "<":
-                population_at_most.append([times, amount - 1])
-            elif sign == ">":
-                population_at_least.append([times, amount + 1])
+force_change = []
+for generations in args.force_change:
+    assert len(generations) in [0, 2], "Wrong number of arguments to -c"
+    if len(generations) == 0:
+        force_change.append([0, 1])
+    elif len(generations) == 2:
+        force_change.append(generations)
 
-    symmetries = []
-    asymmetries = []
-    max_period = 0
-    for symmetry_list, argument_list in [(symmetries, args.symmetry), (asymmetries, args.asymmetry)]:
-        for arguments in argument_list:
-            transformations = []
-            period = None
-            x_translate = None
-            y_translate = None
-            for argument in arguments:
-                re_match = re.match("(^.*?)([0-9]*$)", argument)
-                letters = re_match.group(1).upper()
-                number = re_match.group(2)
-                if letters == "P":
-                    assert period is None, "Can only have one period at a time"
-                    period = int(number)
-                    max_period = max(max_period, period)
-                elif letters == "X":
-                    assert x_translate is None, "Can only have one x_translate at a time"
-                    x_translate = int(number)
-                elif letters == "Y":
-                    assert y_translate is None, "Can only have one y_translate at a time"
-                    y_translate = int(number)
-                else:
-                    assert transformations == [], "Can only impose one symmetry at a time"
-                    transformation = letters + str(number)
-                    if letters == "RO":
-                        transformations.append(letters + str(int(number) % 4))
-                    elif transformation == "C1":
-                        transformations.append("RO0")
-                    elif transformation == "C2":
-                        transformations.append("ro2")
-                    elif transformation == "C4":
-                        transformations.append("ro1")
-                    elif transformation == "D2-":
-                        transformations.append("re-")
-                    elif transformation == "D2\\":
-                        transformations.append("re\\")
-                    elif transformation == "D2|":
-                        transformations.append("re|")
-                    elif transformation == "D2/":
-                        transformations.append("re/")
-                    elif transformation == "D4+":
-                        transformations += ["re-", "re|"]
-                    elif transformation == "D4X":
-                        transformations += ["re/", "re\\"]
-                    elif transformation == "D8":
-                        transformations += ["re-", "re\\"]
-                    else:
-                        assert transformation in ["RE-", "RE/", "RE|",
-                                                  "RE\\"], 'Symmetry argument "' + transformation + '" not recognized'
-                        transformations.append(transformation)
-            if not transformations:
-                transformations = ["RO0"]
-            if period is None:
-                period = 0
-            if x_translate is None:
-                x_translate = 0
-            if y_translate is None:
-                y_translate = 0
-            for transformation in transformations:
-                symmetry_list.append([transformation, x_translate, y_translate, period])
-
-    number_of_search_patterns = sum(map(bool, [
-        args.input_file_name,
-        args.blank_search_pattern,
-        args.check_orphan,
-        args.stator
-    ]))
-    assert number_of_search_patterns < 2, "Too many search patterns specified"
-
-    ignore_transition = None  # Default value
-    rule = src.rules.rule_from_rulestring(args.rule, indent=indent + 1)
-
-    # Add "user_input_" to user's variable names, to prevent collisions"
-    if args.rule is not None and args.rule.strip()[0] == "{":
-        for transition, literal in rule.items():
-            if literal not in ["0", "1"]:
-                variable, negated = variable_from_literal(literal)
-                literal = negate("user_input_" + variable, negated)
-                rule[transition] = literal
-
-    if args.background:
-        # Check current directory and then backgrounds/
-        print_message('Creating background from file "' + args.background[0] + '" ...', 3, indent=indent + 1)
-        if os.path.isfile(args.background[0]):
-            input_string = src.files.string_from_file(
-                args.background[0],
-                indent=indent + 2
-            )
-        elif os.path.isfile(lls_dir +
-                            "/backgrounds/" + args.background[0]):
-            input_string = src.files.string_from_file(lls_dir +
-                                                      "/backgrounds/" + args.background[0],
-                                                      indent=indent + 2
-                                                      )
-        else:
-            assert False, "Search pattern file not found"
-        background_grid, background_ignore_transition = src.search_patterns.search_pattern_from_string(
-            input_string,
-            indent=indent + 2
-        )
-        print_message('Done\n', 3, indent=indent + 1)
+population_at_most = []
+population_at_least = []
+population_exactly = []
+for arguments in args.population:
+    if len(arguments) == 0:
+        population_at_least.append([[0], 1])
     else:
-        (
-            background_grid,
-            background_ignore_transition
-        ) = src.search_patterns.search_pattern_from_string(
-            src.files.string_from_file(lls_dir +
-                                       "/backgrounds/" + src.defaults.background,
-                                       )
-        )
+        constraint = arguments[0]
+        times = [int(t) for t in arguments[1:]] if len(arguments) > 1 else [0]
+        re_match = re.match("(^.*?)([0-9]*$)", constraint)
+        sign = re_match.group(1)
+        amount = int(re_match.group(2))
+        if sign in ["", "="]:
+            population_exactly.append([times, amount])
+        elif sign in ["<=", "=<"]:
+            population_at_most.append([times, amount])
+        elif sign in [">=", "=>"]:
+            population_at_least.append([times, amount])
+        elif sign == "<":
+            population_at_most.append([times, amount - 1])
+        elif sign == ">":
+            population_at_least.append([times, amount + 1])
 
-    if args.background_offset:
-        src.literal_manipulation.offset_background(background_grid, *args.background_offset)
-        src.literal_manipulation.offset_background(background_ignore_transition, *args.background_offset)
+symmetries = []
+asymmetries = []
+max_period = 0
+for symmetry_list, argument_list in [(symmetries, args.symmetry), (asymmetries, args.asymmetry)]:
+    for arguments in argument_list:
+        transformations = []
+        period = None
+        x_translate = None
+        y_translate = None
+        for argument in arguments:
+            re_match = re.match("(^.*?)([0-9]*$)", argument)
+            letters = re_match.group(1).upper()
+            number = re_match.group(2)
+            if letters == "P":
+                assert period is None, "Can only have one period at a time"
+                period = int(number)
+                max_period = max(max_period, period)
+            elif letters == "X":
+                assert x_translate is None, "Can only have one x_translate at a time"
+                x_translate = int(number)
+            elif letters == "Y":
+                assert y_translate is None, "Can only have one y_translate at a time"
+                y_translate = int(number)
+            else:
+                assert transformations == [], "Can only impose one symmetry at a time"
+                transformation = letters + str(number)
+                if letters == "RO":
+                    transformations.append(letters + str(int(number) % 4))
+                elif transformation == "C1":
+                    transformations.append("RO0")
+                elif transformation == "C2":
+                    transformations.append("ro2")
+                elif transformation == "C4":
+                    transformations.append("ro1")
+                elif transformation == "D2-":
+                    transformations.append("re-")
+                elif transformation == "D2\\":
+                    transformations.append("re\\")
+                elif transformation == "D2|":
+                    transformations.append("re|")
+                elif transformation == "D2/":
+                    transformations.append("re/")
+                elif transformation == "D4+":
+                    transformations += ["re-", "re|"]
+                elif transformation == "D4X":
+                    transformations += ["re/", "re\\"]
+                elif transformation == "D8":
+                    transformations += ["re-", "re\\"]
+                else:
+                    assert transformation in ["RE-", "RE/", "RE|",
+                                              "RE\\"], 'Symmetry argument "' + transformation + '" not recognized'
+                    transformations.append(transformation)
+        if not transformations:
+            transformations = ["RO0"]
+        if period is None:
+            period = 0
+        if x_translate is None:
+            x_translate = 0
+        if y_translate is None:
+            y_translate = 0
+        for transformation in transformations:
+            symmetry_list.append([transformation, x_translate, y_translate, period])
 
-    if args.input_file_name:
-        # Check current directory and then search_pattern/
-        print_message('Creating search pattern from file "' + args.input_file_name + '" ...', 3, indent=indent + 1)
-        if os.path.isfile(args.input_file_name):
-            input_string = src.files.string_from_file(
-                args.input_file_name,
-                indent=indent + 2
-            )
-        elif os.path.isfile(lls_dir + "/search_patterns/" + args.input_file_name):
-            input_string = src.files.string_from_file(
-                lls_dir + "/search_patterns/" + args.input_file_name,
-                indent=indent + 2
-            )
-        else:
-            assert False, "Search pattern file not found"
-        grid, ignore_transition = src.search_patterns.search_pattern_from_string(
-            input_string,
-            indent=indent + 2
-        )
-        print_message('Done\n', 3, indent=indent + 1)
+solutions_remaining = 0 if args.dry_run else args.number_of_solutions
 
-    if args.blank_search_pattern:
-        assert len(args.blank_search_pattern) in range(1, 4), "Wrong number of arguments for bounding box"
-        if len(args.blank_search_pattern) == 1:
-            width = args.blank_search_pattern[0]
-            height = args.blank_search_pattern[0]
-            duration = max_period + 1
-        elif len(args.blank_search_pattern) == 2:
-            width = args.blank_search_pattern[0]
-            height = args.blank_search_pattern[1]
-            duration = max_period + 1
-        elif len(args.blank_search_pattern) == 3:
-            width = args.blank_search_pattern[0]
-            height = args.blank_search_pattern[1]
-            duration = args.blank_search_pattern[2]
-        else:
-            raise Exception("Wrong number of arguments for bounding box")
-        grid = src.search_patterns.blank_search_pattern(width, height, duration, indent=indent + 1)
+ignore_transition = None  # Default value
+rule = src.rules.rule_from_rulestring(args.rule)
 
-    if args.check_orphan:
-        if os.path.isfile(args.check_orphan[0]):
-            file_name = args.check_orphan[0]
-        elif os.path.isfile(lls_dir + "/search_patterns/" + args.check_orphan[0]):
-            file_name = lls_dir + "/search_patterns/" + args.check_orphan[0]
-        else:
-            assert False, "Search pattern file not found"
-        if len(args.check_orphan) == 2:
-            number_of_generations = int(args.check_orphan[1])
-        else:
-            number_of_generations = 1
-        grid, ignore_transition = src.search_patterns.check_orphan(file_name, number_of_generations, indent=indent + 1)
+# Add "user_input_" to user's variable names, to prevent collisions"
+if args.rule is not None and args.rule.strip()[0] == "{":
+    for transition, literal in rule.items():
+        if literal not in ["0", "1"]:
+            variable, negated = variable_from_literal(literal)
+            literal = negate("user_input_" + variable, negated)
+            rule[transition] = literal
 
-    if args.stator:
-        if os.path.isfile(args.stator[0]):
-            file_name = args.stator[0]
-        elif os.path.isfile(lls_dir + "/search_patterns/" + args.stator[0]):
-            file_name = lls_dir + "/search_patterns/" + args.stator[0]
-        else:
-            assert False, "Search pattern file not found"
-        grid, _ = src.formatting.parse_input_string(
-            src.files.string_from_file(
-                file_name,
-                indent=indent + 1
-            ),
-            indent=indent + 1)
-        grid = src.search_patterns.stator_search_pattern(grid[0], rule, background_grid, indent=indent + 1)
-
-    if number_of_search_patterns == 0:
-        print_message('\nNo pattern specified, getting from STDIN... (End with EOF character)\n', 2, indent=indent + 1)
-        input_string = sys.stdin.read()
-        print_message('\n', 1, indent=indent + 1)
-        grid, ignore_transition = src.search_patterns.search_pattern_from_string(input_string, indent=indent + 1)
-
-    # Create the search pattern
-    search_pattern = SearchPattern(
-        grid,
-        ignore_transition=ignore_transition,
-        background_grid=background_grid,
-        background_ignore_transition=background_ignore_transition,
-        rule=rule
+if args.background:
+    # Check current directory and then backgrounds/
+    log('Creating background from file "' + args.background[0] + '" ...', 1)
+    if os.path.isfile(args.background[0]):
+        input_string = src.files.string_from_file(args.background[0])
+    elif os.path.isfile(lls_dir +
+                        "/backgrounds/" + args.background[0]):
+        input_string = src.files.string_from_file(lls_dir + "/backgrounds/" + args.background[0])
+    else:
+        assert False, "Search pattern file not found"
+    background_grid, background_ignore_transition = src.search_patterns.search_pattern_from_string(input_string)
+    log('Done\n', -1)
+else:
+    (
+        background_grid,
+        background_ignore_transition
+    ) = src.search_patterns.search_pattern_from_string(
+        src.files.string_from_file(lls_dir +
+                                   "/backgrounds/" + settings.background,
+                                   )
     )
 
-    print_message('Done\n', indent=indent)
+if args.background_offset:
+    src.literal_manipulation.offset_background(background_grid, *args.background_offset)
+    src.literal_manipulation.offset_background(background_ignore_transition, *args.background_offset)
 
-    # LLS_main.LLS does all the hard work
-    src.main.lls(
+
+
+if args.input_file_name and args.blank_search_pattern:
+    raise Exception("Too many search patterns specified")
+
+if args.input_file_name:
+    # Check current directory and then search_pattern/
+    log('Creating search pattern from file "' + args.input_file_name + '" ...', 1)
+    if os.path.isfile(args.input_file_name):
+        input_string = src.files.string_from_file(args.input_file_name)
+    elif os.path.isfile(lls_dir + "/search_patterns/" + args.input_file_name):
+        input_string = src.files.string_from_file(lls_dir + "/search_patterns/" + args.input_file_name)
+    else:
+        assert False, "Search pattern file not found"
+    grid, ignore_transition = src.search_patterns.search_pattern_from_string(input_string)
+    log('Done\n', -1)
+
+elif args.blank_search_pattern:
+    assert len(args.blank_search_pattern) in range(1, 4), "Wrong number of arguments for bounding box"
+    if len(args.blank_search_pattern) == 1:
+        width = args.blank_search_pattern[0]
+        height = args.blank_search_pattern[0]
+        duration = max_period + 1
+    elif len(args.blank_search_pattern) == 2:
+        width = args.blank_search_pattern[0]
+        height = args.blank_search_pattern[1]
+        duration = max_period + 1
+    elif len(args.blank_search_pattern) == 3:
+        width = args.blank_search_pattern[0]
+        height = args.blank_search_pattern[1]
+        duration = args.blank_search_pattern[2]
+    else:
+        raise Exception("Wrong number of arguments for bounding box")
+    grid = src.search_patterns.blank_search_pattern(width, height, duration)
+else:
+    log('\nNo pattern specified, getting from STDIN... (End with EOF character)\n', 0, 2)
+    input_string = sys.stdin.read()
+    log('\n', 0, 2)
+    grid, ignore_transition = src.search_patterns.search_pattern_from_string(input_string)
+
+# Create the search pattern
+search_pattern = SearchPattern(
+    grid,
+    ignore_transition=ignore_transition,
+    background_grid=background_grid,
+    background_ignore_transition=background_ignore_transition,
+    rule=rule
+)
+
+log('Done\n', -1, 2)
+log('Preprocessing...', 1, 2)
+
+try:
+    # Constraints that change the grid
+    search_pattern.standardise_variables_names()
+    for symmetry in symmetries:
+        search_pattern.force_symmetry(symmetry)
+
+    search_pattern.remove_redundancies()
+    search_pattern.standardise_variables_names()
+except UnsatInPreprocessing:
+    log("Unsatisfiability proved in preprocessing", 0, 2)
+    log('Done\n', -1, 2)
+    sys.exit()
+
+log("Search grid:\n",1)
+log(search_pattern.make_string(pattern_output_format="csv", show_background=True))
+log('Done\n', -1)
+
+# Constraints that are enforced by clauses
+for asymmetry in asymmetries:
+    search_pattern.force_asymmetry(asymmetry)
+for constraint in population_at_most:
+    search_pattern.force_population_at_most(constraint)
+for constraint in population_at_least:
+    search_pattern.force_population_at_least(constraint)
+for constraint in population_exactly:
+    search_pattern.force_population_exactly(constraint)
+if args.max_change is not None:
+    search_pattern.force_max_change(args.max_change)
+if args.max_decay is not None:
+    search_pattern.force_max_decay(args.max_decay)
+if args.max_growth is not None:
+    search_pattern.force_max_growth(args.max_growth)
+for times in force_change:
+    search_pattern.force_change(times)
+
+# The most important bit. Enforces the evolution rules
+search_pattern.force_evolution(method=args.method)
+
+log('Done\n', -1, 2)
+save_state=args.save_state
+if save_state:
+    if isinstance(save_state, str):
+        state_file = save_state
+    else:
+        state_file = src.files.find_free_file_name("lls_state", ".pkl")
+    log("Saving state...", 1)
+    src.files.file_from_object(
+        state_file,
+        (search_pattern.grid, search_pattern.ignore_transition, search_pattern.background_grid,
+         search_pattern.background_ignore_transition, search_pattern.rule,
+         search_pattern.clauses.DIMACS_literal_from_variable)
+    )
+    log("Done\n", -1)
+# Problem statistics
+log('Width: ' + str(len(search_pattern.grid[0][0])), 0, 2)
+log('Height: ' + str(len(search_pattern.grid[0])), 0, 2)
+log('Duration: ' + str(len(search_pattern.grid)) + "\n", 0, 2)
+log('Number of undetermined cells: ' + str(search_pattern.number_of_cells()), 0, 2)
+log('Number of variables: ' + str(search_pattern.clauses.number_of_variables), 0, 2)
+log('Number of clauses: ' + str(len(search_pattern.clauses.clause_set)) + "\n", 0, 2)
+
+save_dimacs=args.save_dimacs
+if save_dimacs is not None:
+    if not isinstance(save_dimacs, str):
+        save_dimacs = src.files.find_free_file_name("lls_dimacs", ".cnf")
+    search_pattern.clauses.make_file(save_dimacs)
+
+determined = search_pattern.deterministic()
+show_background = search_pattern.background_nontrivial()
+
+time_taken = 0
+while solutions_remaining > 0:
+    (
+        status,
+        solution,
+        extra_time_taken
+    ) = sat_solve(
         search_pattern,
-        symmetries=symmetries,
-        asymmetries=asymmetries,
-        population_at_most=population_at_most,
-        population_at_least=population_at_least,
-        population_exactly=population_exactly,
-        max_change=args.max_change,
-        max_decay=args.max_decay,
-        max_growth=args.max_growth,
-        force_change=force_change,
         solver=args.solver,
         parameters=args.parameters,
-        timeout=args.timeout,
-        save_dimacs=args.save_dimacs,
-        save_state=args.save_state,
-        method=args.method,
-        dry_run=args.dry_run,
-        number_of_solutions=args.number_of_solutions,
-        pattern_output_format=pattern_output_format,
-        output_file_name=output_file_name,
-        indent=indent
+        timeout=args.timeout
     )
+    time_taken += extra_time_taken
+    if status == Status.SAT:
+        solutions_remaining -= 1
+        output_string = solution.make_string(
+            pattern_output_format=pattern_output_format,
+            determined=determined,
+            show_background=show_background
+        )
+    else:
+        output_string = status.value
+    log(output_string + "\n", 0, 1)
+    if output_file_name:
+        log('Writing output file...', 1, 2)
+        src.files.append_to_file_from_string(output_file_name, output_string)
+        log('Done\n', -1, 2)
+    if status == Status.SAT and solutions_remaining > 0:
+        search_pattern.force_distinct(solution, determined=determined)
+    else:
+        break
+
+log('Total solver time: ' + str(time_taken), 0, 2)
