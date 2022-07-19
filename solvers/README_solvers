@@ -1,0 +1,2 @@
+Add SAT solvers in this directory for LLS to be able to find them.
+(This README exists to prevent git from forgetting about this directory.)

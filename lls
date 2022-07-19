@@ -125,13 +125,6 @@ parser.add_argument(
     help="Save the state (to the given filename, or to a default if one isn't given)"
 )
 parser.add_argument(
-    "--substitute_solution",
-    nargs=2,
-    default=None,
-    metavar=("STATE", "SOLUTION"),
-    help="Substitute a solution into a saved state"
-)
-parser.add_argument(
     "--dry_run",
     action="store_true",
     help="Don't run the solver, but do preprocess."
@@ -186,7 +179,8 @@ lls_dir = os.path.dirname(os.path.realpath(__file__))
 src.logging.verbosity_level = args.verbosity
 
 if args.version:
-    log('Version 3\n', 0, 1)
+    log('4', 0, 1)
+    sys.exit()
 pattern_output_format = args.csv
 output_file_name = args.output_file_name
 

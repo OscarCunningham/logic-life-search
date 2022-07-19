@@ -9,19 +9,6 @@ class ClauseList:
         self.number_of_variables = 0
         self.dimacs_literal_from_variable = {}
 
-    def __eq__(self, other):
-        if other is None:
-            return False
-        else:
-            return (
-                    self.clause_set == other.clause_set
-                    and self.number_of_variables == other.number_of_variables
-                    and self.dimacs_literal_from_variable == other.dimacs_literal_from_variable
-            )
-
-    def __ne__(self, other):
-        return not __eq__(self, other)
-
     def append(self, clause):
         dimacs_clause = []
         clause = set(clause)
