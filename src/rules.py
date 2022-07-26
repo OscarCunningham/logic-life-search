@@ -1,6 +1,5 @@
 import re
-import ast
-from src.literal_manipulation import variable_from_literal, standard_form_literal
+from src.literal_manipulation import variable_from_literal
 from src.logging import log
 
 possible_transitions = {"0": sorted("c"),
