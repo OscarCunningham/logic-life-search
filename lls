@@ -83,13 +83,6 @@ parser.add_argument(
     help='Program will time out if the solver runs for longer than TIMEOUT seconds'
 )
 parser.add_argument(
-    '--csv',
-    action='store_const',
-    default=None,
-    const="csv",
-    help="Give output in csv format rather than the usual RLE."
-)
-parser.add_argument(
     '-V', '--version',
     action="store_true",
     help='Displays the version number'
