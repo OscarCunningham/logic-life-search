@@ -23,7 +23,7 @@ def file_from_string(file_name, input_string):
 def append_to_file_from_string(file_name, input_string):
     """Append string to file"""
     log('Writing to file "' + file_name + '" ...', 1)
-    with open(file_name, "a+") as output_file:
+    with open(file_name, "a") as output_file:
         output_file.write(input_string)
     log('Done\n', -1)
 
