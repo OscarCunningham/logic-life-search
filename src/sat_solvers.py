@@ -18,7 +18,7 @@ class Status(enum.Enum):
 def sat_solve(dimacs_string, solver=None, parameters=None, timeout=None):
     """Solve the given DIMACS problem, using the specified SAT solver"""
 
-    log('Solving...', 1)
+    log('Solving...', 1, 2)
 
     if solver is None:
         solver = settings.solver
@@ -39,8 +39,13 @@ def sat_solve(dimacs_string, solver=None, parameters=None, timeout=None):
             encoding="utf-8"
         )
         end_time = time.time()
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as error:
         end_time = time.time()
+        log('Timed out\n', -1)
+        log("SAT solver output:", 1)
+        log(error.stdout.decode("utf-8"))
+        log('Done\n', -1)
+        log('Done\n', -1,2)
         return Status.TIMEOUT, None, end_time - start_time
 
     log('Done\n', -1)
@@ -59,5 +64,5 @@ def sat_solve(dimacs_string, solver=None, parameters=None, timeout=None):
     status, solution = src.formatting.format_dimacs_output(out)
     log('Done\n', -1)
 
-    log('Done\n', -1)
+    log('Done\n', -1,2)
     return status, solution, time_taken
