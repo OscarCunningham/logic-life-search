@@ -673,7 +673,7 @@ class SearchPattern:
         for cell_0, cell_1 in cell_pair_list:
             variable_0, negated_0 = variable_from_literal(cell_0)
             variable_1, negated_1 = variable_from_literal(cell_1)
-            cell_0, cell_1 = max(variable_0,variable_1), min(variable_0,variable_1) * negated_0 * negated_1
+            cell_0, cell_1 = max(variable_0, variable_1), min(variable_0, variable_1) * negated_0 * negated_1
             while cell_0 not in [-1, 1]:
                 variable_0, negated_0 = variable_from_literal(cell_0)
                 if variable_0 in replacement:
