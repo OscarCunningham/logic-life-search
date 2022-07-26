@@ -106,9 +106,9 @@ class SearchPattern:
             rule = ast.literal_eval(rulestring)
             input_literals += list(rule.values())
 
-        input_variables = set(variable_from_literal(standard_form_literal(literal)) for literal in input_literals)
+        input_variables = set(variable_from_literal(standard_form_literal(literal))[0] for literal in input_literals)
 
-        variable_dict = {}
+        variable_dict = {'1':1}
         numeric_variables = set()
         nonnumeric_variables = set()
         for variable in input_variables:
@@ -122,7 +122,7 @@ class SearchPattern:
                 if variable != '*':
                     nonnumeric_variables.add(variable)
 
-        self.number_of_variables = max(self.number_of_variables, max(variable for variable in variable_dict))
+        self.number_of_variables = max(self.number_of_variables, max(int(variable) for variable in variable_dict))
 
         for variable in nonnumeric_variables:
             self.number_of_variables += 1
@@ -167,7 +167,7 @@ class SearchPattern:
         else:
             new_rule, self.number_of_variables = src.rules.rule_from_rulestring(rulestring, self.number_of_variables)
 
-        return new_grid, new_background_grid, rule
+        return new_grid, new_background_grid, new_rule
 
     def number_of_cells(self):
         return len(set(abs(cell) for generation in self.grid for row in generation for cell in row if
