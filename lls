@@ -433,3 +433,6 @@ while solutions_remaining > 0:
         break
 
 log('Total solver time: ' + str(time_taken), 0, 2)
+
+if src.logging.indent_level:
+    raise Exception('LLS completed succesfully, but indentation of logs got messed up.')
