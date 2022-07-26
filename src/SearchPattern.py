@@ -8,6 +8,7 @@ import src.rules
 import settings
 import src.files
 import src.literal_manipulation
+import src.symmetries
 from src.logging import log
 from src.literal_manipulation import variable_from_literal, neighbours_from_coordinates, implies, standard_form_literal
 from src.utilities import make_grid
@@ -488,18 +489,22 @@ class SearchPattern:
         to_force_equal = self.cell_pairs_from_transformation(symmetry)
         self.force_equal(to_force_equal)
 
+    def force_symmetry_group(self, symmetry_group):
+        width = len(self.grid[0][0])
+        height = len(self.grid[0])
+        symmetries = src.symmetries.transformations_from_group(symmetry_group,width-2,height-2)
+        to_force_equal = sum((self.cell_pairs_from_transformation(symmetry) for symmetry in symmetries), start=[])
+        self.force_equal(to_force_equal)
+
     def force_asymmetry(self, asymmetry):
         to_force_unequal = self.cell_pairs_from_transformation(asymmetry)
         self.force_unequal(to_force_unequal)
 
+    def force_asymmetry_group(self, asymmetry):
+        assert False, 'Not yet implemented'
+
     def cell_pairs_from_transformation(self, symmetry):
-        (
-            transformation,
-            x_translate,
-            y_translate,
-            period
-        ) = symmetry
-        transformation = transformation.upper()
+
         width = len(self.grid[0][0])
         height = len(self.grid[0])
         duration = len(self.grid)
@@ -507,67 +512,25 @@ class SearchPattern:
         background_height = len(self.background_grid[0])
         background_duration = len(self.background_grid)
 
-        transformations = {
-            "RO0": (
-                lambda x, y: (x + x_translate, y + y_translate),
-                lambda x, y: (x - x_translate, y - y_translate)
-            ),
-            "RO1": (
-                lambda x, y: ((height - 1) - y + x_translate, x + y_translate),
-                lambda x, y: (y - y_translate, (height - 1) - (x - x_translate))
-            ),
-            "RO2": (
-                lambda x, y: ((width - 1) - x + x_translate, (height - 1) - y + y_translate),
-                lambda x, y: ((width - 1) - (x - x_translate), (height - 1) - (y - y_translate))
-            ),
-            "RO3": (
-                lambda x, y: (y + x_translate, (height - 1) - x + y_translate),
-                lambda x, y: ((height - 1) - (y - y_translate), x - x_translate)
-            ),
-            "RE-": (
-                lambda x, y: (x + x_translate, (height - 1) - y + y_translate),
-                lambda x, y: (x - x_translate, (height - 1) - (y - y_translate))
-            ),
-            "RE\\": (
-                lambda x, y: (y + x_translate, x + y_translate),
-                lambda x, y: (y - y_translate, x - x_translate)
-            ),
-            "RE|": (
-                lambda x, y: ((width - 1) - x + x_translate, y + y_translate),
-                lambda x, y: ((width - 1) - (x - x_translate), y - y_translate)
-            ),
-            "RE/": (
-                lambda x, y: ((height - 1) - y + x_translate, (height - 1) - x + y_translate),
-                lambda x, y: ((height - 1) - (y - y_translate), (height - 1) - (x - x_translate))
-            )
-        }
-
-        f, f_inv = transformations[transformation]
+        inverse_symmetry = src.symmetries.invert_transformation(symmetry)
 
         cell_pairs = []
 
         for x_0 in range(width):
             for y_0 in range(height):
-                for t in range(duration):
-                    cell_0 = self.grid[t][y_0][x_0]
-                    if t < duration - period:
-                        x_1, y_1 = f(x_0, y_0)
-                        if 0 <= x_1 < width and 0 <= y_1 < height:
-                            other_cell = self.grid[t + period][y_1][x_1]
-                        else:
-                            other_cell = \
-                                self.background_grid[(t + period) % background_duration][y_1 % background_height][
-                                    x_1 % background_width]
-                        cell_pairs.append((cell_0, other_cell))
-                    if t >= period:
-                        x_1, y_1 = f_inv(x_0, y_0)
-                        if 0 <= x_1 < width and 0 <= y_1 < height:
-                            other_cell = self.grid[t - period][y_1][x_1]
-                        else:
-                            other_cell = \
-                                self.background_grid[(t - period) % background_duration][y_1 % background_height][
-                                    x_1 % background_width]
-                        cell_pairs.append((cell_0, other_cell))
+                for t_0 in range(duration):
+                    cell_0 = self.grid[t_0][y_0][x_0]
+                    for x_1, y_1, t_1 in (
+                            src.symmetries.apply_transformation(symmetry, x_0-1, y_0-1, t_0),
+                            src.symmetries.apply_transformation(inverse_symmetry, x_0-1, y_0-1, t_0)
+                    ):
+                        if 0 <= t_1 < duration:
+                            if 0 <= x_1+1 < width and 0 <= y_1+1 < height:
+                                other_cell = self.grid[t_1][y_1+1][x_1+1]
+                            else:
+                                other_cell = \
+                                    self.background_grid[t_1 % background_duration][(y_1+1) % background_height][(x_1+1) % background_width]
+                            cell_pairs.append((cell_0, other_cell))
         return cell_pairs
 
     def force_at_least(self, literals, amount):
