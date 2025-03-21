@@ -769,7 +769,7 @@ class SearchPattern:
 
         log('Formatting output...', 1)
 
-        assert pattern_output_format in ["rle", "csv"], "Format not recognised"
+        assert pattern_output_format in ["rle", "csv", "jdf"], "Format not recognised"
 
         background_grid = copy.deepcopy(self.background_grid)
         src.literal_manipulation.offset_background(background_grid, -1, -1, 0)
@@ -794,6 +794,8 @@ class SearchPattern:
                 determined=determined,
                 show_background=show_background
             )
+        elif pattern_output_format == "jdf":
+            output_string = src.formatting.make_jdf(self.grid)
         else:
             raise Exception
 

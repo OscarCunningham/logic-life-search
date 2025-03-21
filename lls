@@ -68,6 +68,11 @@ parser.add_argument(
     help='File for the output to be saved to'
 )
 parser.add_argument(
+    '-j', '--jdf_prefix',
+    default=None,
+    help='Directory and prefix for JLS files'
+)
+parser.add_argument(
     '-M', '--method',
     type=int,
     default=None,
@@ -179,10 +184,11 @@ lls_dir = os.path.dirname(os.path.realpath(__file__))
 src.logging.verbosity_level = args.verbosity
 
 if args.version:
-    log('4', 0, 1)
+    log('5', 0, 1)
     sys.exit()
 pattern_output_format = args.csv
 output_file_name = args.output_file_name
+jdf_prefix = args.jdf_prefix
 
 log('Getting search pattern...', 1, 2)
 
@@ -456,6 +462,7 @@ while solutions_remaining > 0:
         timeout=args.timeout
     )
     time_taken += extra_time_taken
+    jdf_string = None
     if status == Status.SAT:
         solutions_remaining -= 1
         output_string = solution.make_string(
@@ -463,6 +470,8 @@ while solutions_remaining > 0:
             determined=determined,
             show_background=show_background
         )
+        if jdf_prefix:
+            jdf_string = solution.make_string(pattern_output_format="jdf")
     else:
         output_string = status.value
     log(output_string + "\n", 0, 1)
@@ -470,6 +479,13 @@ while solutions_remaining > 0:
         log('Writing output file...', 1, 2)
         src.files.append_to_file_from_string(output_file_name, output_string)
         log('Done\n', -1, 2)
+    if jdf_string is not None:
+        if os.path.isfile(jdf_prefix):
+            jdf_prefix = src.files.find_free_file_name(jdf_prefix + "_", "")
+        os.makedirs(jdf_prefix, exist_ok=True)
+        directory = jdf_prefix + "/"
+        save_jdf = src.files.find_free_file_name(jdf_prefix + "_", ".jdf", directory=directory)
+        src.files.append_to_file_from_string(directory + save_jdf, jdf_string)
     if status == Status.SAT and solutions_remaining > 0:
         search_pattern.force_distinct(solution, determined=determined)
     else:
