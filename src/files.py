@@ -44,11 +44,11 @@ def object_from_file(file_name):
     log('Done\n', -1)
     return input_object
 
-def find_free_file_name(prefix, suffix):
+def find_free_file_name(prefix, suffix, directory=""):
     file_number = 0
     while True:
         file_name = prefix + str(file_number) + suffix
-        if not os.path.isfile(file_name):
+        if not os.path.isfile(directory + file_name):
             break
         file_number += 1
     return file_name
