@@ -204,16 +204,11 @@ parser.add_argument(
 parser.add_argument(
     '--polyomino',
     type=int,
-    nargs=2,
+    nargs="?",
     default=None,
-    metavar=("COLUMN", "ROW"),
-    help='Force generation 0 to be a polyomino including an on cell at the specified location'
-)
-parser.add_argument(
-    '--polyomino_max_path',
-    type=int,
-    default=None,
-    help='Maximum path length within the polyomino from the specified initial cell'
+    const=-1,
+    metavar="MAX_RADIUS",
+    help='Force generation 0 to be a polyomino'
 )
 args = parser.parse_args()
 
@@ -489,7 +484,7 @@ if args.layer_max_rotor is not None:
                                           args.layer_rotor_include_set_cells,
                                           subperiod_array)
 if args.polyomino is not None:
-    search_pattern.force_polyomino(args.polyomino,args.polyomino_max_path)
+    search_pattern.force_polyomino(args.polyomino)
 for times in force_change:
     search_pattern.force_change(times)
 

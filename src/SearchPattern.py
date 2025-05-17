@@ -702,32 +702,28 @@ class SearchPattern:
             self.force_at_most(literals, max_rotor)
         log("Done\n", -1)
 
-    def force_polyomino(self, first_cell, max_distance=None):
+    def force_polyomino(self, max_radius):
         log("Forcing the pattern to be a polyomino in generation 0", 1)
         width = len(self.grid[0][0])
         height = len(self.grid[0])
 
-        x_0,y_0 = first_cell
+        # If no value was given for max_radius, use width*height-1.
+        if max_radius < 0:
+            max_radius = width*height-1;
 
-        x_0 += 1
-        y_0 += 1
+        # Set a cell to be our base cell for the polynomial. max_radius is the maximum
+        # distance within the polyomino between this cell and any other polyomino cell.
+        self.force_exactly([str(x) + "_" + str(y) + "_within_distance_" + str(0) for x in range(width) for y in range(height)],1)
 
-        if max_distance is None:
-            max_distance = width*height-1;
-
-        # An ON cell is a distance d away from first_cell if there is a path through the polyomino
-        # from first_cell to the target cell of length at most d
-
-        self.clauses.append([self.grid[0][y_0][x_0]])
-        self.clauses.append([str(x_0) + "_" + str(y_0) + "_within_distance_" + str(0)])
-
+        # The base polyomino cell must be ON.
         for x in range(width):
             for y in range(height):
-                if x == x_0 and y == y_0:
-                    continue
-                self.clauses.append([negate(str(x) + "_" + str(y) + "_within_distance_" + str(0))])
+                self.clauses.append(implies([str(x) + "_" + str(y) + "_within_distance_" + str(0)], self.grid[0][y][x]))
 
-        for d in range(1,max_distance+1):
+        # For each distance d, "x_y_within_distance_d" indicates whether the cell
+        # at (x,y) is within distance d (traversed through the polyomino) of the
+        # base polyomino cell
+        for d in range(1,max_radius+1):
             for x in range(width):
                 for y in range(height):
                     literal = str(x) + "_" + str(y) + "_within_distance_" + str(d)
@@ -738,11 +734,12 @@ class SearchPattern:
                                                  negate(str(x) + "_" + str(y-1) + "_within_distance_" + str(d-1)),
                                                  negate(str(x) + "_" + str(y+1) + "_within_distance_" + str(d-1))], negate(literal)))
 
-        # A cell is on in generation 0 if and only if it is part of the polyomino starting at first_cell
+        # A cell is on in generation 0 if and only if it is part of the polyomino
+        # (i.e., is within distance max_radius of the base polyomino cell)
         for x in range(width):
             for y in range(height):
-                self.clauses.append(implies([self.grid[0][y][x]], str(x) + "_" + str(y) + "_within_distance_" + str(max_distance)))
-                self.clauses.append(implies([str(x) + "_" + str(y) + "_within_distance_" + str(max_distance)], self.grid[0][y][x]))
+                self.clauses.append(implies([self.grid[0][y][x]], str(x) + "_" + str(y) + "_within_distance_" + str(max_radius)))
+                self.clauses.append(implies([str(x) + "_" + str(y) + "_within_distance_" + str(max_radius)], self.grid[0][y][x]))
         log("Done\n", -1)
 
     def force_equal(self, argument_0, argument_1=None):
