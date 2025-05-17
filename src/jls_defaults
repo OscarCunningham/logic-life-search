@@ -49,7 +49,3 @@ layers_start_column=0
 layers_start_row=0
 layers_type=Columns
 
-[CellArray]
-
-read_only=No
-
