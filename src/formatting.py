@@ -12,7 +12,110 @@ def get_array(line, n):
     return eval('[' + re.findall(r"\{(.*?)\}", line)[n] + ']')
 
 
+def get_jdf_args(input_string):
+    """Obtain settings from JLS status file"""
+
+    jdf_args = input_string[:input_string.find('[CellArray]')]
+
+    subperiod_array = []
+    for line in input_string.splitlines():
+        # To get the subperiod settings for each cell, we must reduce every entry in the "stacks" array mod 8.
+        if line.startswith("stacks"):
+            subperiod_array.append(list(map(lambda x: x % 8, get_array(line,1))))
+
+        # Lines after "[Search]" represent the search state. We only want the initial setup.
+        if line.startswith("[Search]"):
+            break
+
+    for line in jdf_args.splitlines():
+        if line.startswith("symmetry="):
+            symmetry = line.split("=")[1]
+        elif line.startswith("rule_birth="):
+            rule_birth = line.split("=")[1][1:-1]
+        elif line.startswith("rule_survival="):
+            rule_survival = line.split("=")[1][1:-1]
+        elif line.startswith("limit_generation_0="):
+            limit_generation_0 = line.split("=")[1]
+        elif line.startswith("limit_generation_0_cells="): 
+            limit_generation_0_cells = eval(line.split("=")[1])
+        elif line.startswith("layers_active_constraint="):    
+            layers_active_constraint = line.split("=")[1]
+        elif line.startswith("layers_active_cells="): 
+            layers_active_cells = eval(line.split("=")[1])
+        elif line.startswith("layers_active_cells_variables_only="):    
+            layers_active_cells_variables_only = line.split("=")[1]
+        elif line.startswith("layers_start_column="): 
+            layers_start_column = eval(line.split("=")[1])
+        elif line.startswith("layers_start_row="): 
+            layers_start_row = eval(line.split("=")[1])
+        elif line.startswith("layers_type="):    
+            layers_type = line.split("=")[1]
+
+        #Currently unsupported
+        elif line.startswith("save_solutions="):    
+            save_solutions = line.split("=")[1]
+        elif line.startswith("save_solutions_file="):    
+            save_solutions_file = line.split("=")[1]
+        elif line.startswith("save_solutions_all_generations="):    
+            save_solutions_all_generations = line.split("=")[1]
+        elif line.startswith("save_status="):    
+            save_status = line.split("=")[1]
+        elif line.startswith("save_status_file="):    
+            save_status_file = line.split("=")[1]
+        elif line.startswith("limit_generation_0_variables_only="):    
+            limit_generation_0_variables_only = line.split("=")[1]
+        elif line.startswith("layers_live_constraint="):    
+            layers_live_constraint = line.split("=")[1]
+        elif line.startswith("layers_live_cells="): 
+            layers_live_cells = eval(line.split("=")[1])
+        elif line.startswith("layers_live_cells_variables_only="):    
+            layers_live_cells_variables_only = line.split("=")[1]
+
+    lls_args = []
+    if symmetry != "None":
+        lls_args.append("--symmetry")
+        if symmetry == "Rotate-180":
+            lls_args.append("C2")
+        elif symmetry == "Rotate-90":
+            lls_args.append("C4")
+        elif symmetry == "Mirror-Horizontal":
+            lls_args.append("D2|")
+        elif symmetry == "Mirror-Vertical":
+            lls_args.append("D2-")
+        elif symmetry == "Mirror-Diagonal":
+            lls_args.append("D2/")
+        elif symmetry == "Mirror-Diagonal-Backwards":
+            lls_args.append("D2\\")
+        elif symmetry == "4-Fold":
+            lls_args.append("D4+")
+        elif symmetry == "8-Fold":
+            lls_args.append("D8")
+
+    rule = "B"
+    for i, value in enumerate(rule_birth.split(",")):
+        if value == "Yes":
+            rule += str(i)
+    rule += "/S"
+    for i, value in enumerate(rule_survival.split(",")):
+        if value == "Yes":
+            rule += str(i)
+    lls_args += ["--rule", rule]
+
+    if limit_generation_0 == "Yes":
+        lls_args += ["--population", "<=" + str(limit_generation_0_cells)]
+    lls_args += ["--layer_center", str(layers_start_column), str(layers_start_row)]
+    lls_args += ["--layer_shape", layers_type]
+    if layers_active_constraint == "Yes":
+        lls_args += ["--layer_max_rotor", str(layers_active_cells)]
+    if layers_active_cells_variables_only == "No":
+        lls_args.append("--layer_rotor_include_set_cells")
+
+    return lls_args, jdf_args, subperiod_array
+
+
 def parse_jdf(input_string):
+    """Convert a JLS status file into LLS input string format"""
+
     # JLS cell states
     OFF              = 0
     ON               = 1
@@ -38,6 +141,10 @@ def parse_jdf(input_string):
 
         if line.startswith("generations="):
             generations = eval(line.split("=")[1])
+
+        # This indicates whether the search is periodic or is a predecessor search
+        if line.startswith("tile_temporal="):
+            tile_temporal = line.split("=")[1]
 
         # Element 0 of subperiods is the full period (same as generations), and elements 1 through 6 are the subperiods
         if line.startswith("periods="):
@@ -78,11 +185,11 @@ def parse_jdf(input_string):
                 elif the_cell == FROZEN or the_cell == UNCHECKED_FROZEN:
                     lls_array[gen][row][column] = lls_array[gen - 1][row][column]
 
-                # Special suffix so that unchecked cells don't have to have to obey subperiodicity
+                # Special suffix so that unchecked cells do not need to obey subperiodicity
                 if the_cell == UNCHECKED:
                     lls_array[gen][row][column] += "_uc" + str(gen)
 
-                # apostrophe suffix means the cell does not need to obey the CA rules
+                # Apostrophe suffix means the cell does not need to obey the CA rules
                 if the_cell == UNSET or subperiod_array[row][column] == 6:
                     lls_array[gen][row][column] += "'"
 
@@ -95,7 +202,6 @@ def parse_jdf(input_string):
 
     # Create the LLS input file text
     lls_input = ""
-
     for gen in range(generations):
         for row in range(rows):
             for column in range(columns):
@@ -104,8 +210,8 @@ def parse_jdf(input_string):
         if gen == 0:
             gen_zero = lls_input
         lls_input += "\n"
-
-    lls_input += gen_zero
+    if tile_temporal == "Yes":
+        lls_input += gen_zero
 
     return lls_input
 
@@ -167,7 +273,7 @@ def parse_input_string(input_string):
     return grid, ignore_transition
 
 
-def make_jdf(grid):
+def make_jdf(grid, jdf_args, subperiod_array):
     """Turn a search pattern into a JLS status file"""
 
     log('Format: jdf')
@@ -176,24 +282,30 @@ def make_jdf(grid):
     height = len(grid[0])
     duration = len(grid)
 
-    jdf_string = "[Properties]\n\ncolumns=" \
-                + str(width-2) \
-                + "\nrows=" + str(height-2) \
-                + "\ngenerations=" + str(duration-1) \
-                + "\nperiods={" + str(duration-1) + ",1,2,3,4,5,6}\n"
+    jdf_string = jdf_args
+    if jdf_string is None:
+        jdf_string = "# JavaLifeSearch status file, automatically generated\n\n[Properties]\n" \
+                    + "\ncolumns=" + str(width-2) \
+                    + "\nrows=" + str(height-2) \
+                    + "\ngenerations=" + str(duration-1) \
+                    + "\nperiods={" + str(duration-1) + ",1,2,3,4,5,6}\n"
+        with open(os.path.dirname(os.path.realpath(__file__)) + "/jls_defaults", "r") as file:
+            jdf_string += file.read()
+    jdf_string += "[CellArray]\n\nread_only=No\n\n"
 
-    with open(os.path.dirname(os.path.realpath(__file__)) + "/jls_defaults", "r") as file:
-        jdf_string += file.read()
-        #for line in file:
-        #    jdf_string += line
-
-    stacks_rows = [["0"]*(width-2) for y in range(height-2)]
+    if subperiod_array is None:
+        stacks_array = [[0]*(width-2) for y in range(height-2)]
+    else:
+        stacks_array = copy.deepcopy(subperiod_array)
 
     for x in range(1,width-1):
         for y in range(1,height-1):
             for t in range(duration):
                 if grid[t][y][x] != grid[0][y][x]:
-                    stacks_rows [y-1][x-1] = "16"
+                    stacks_array [y-1][x-1] += 16
+                    break
+
+    stacks_array = [[str(cell) for cell in row] for row in stacks_array]
 
     for t, generation in enumerate(grid):
         if t == duration-1:
@@ -205,7 +317,7 @@ def make_jdf(grid):
         jdf_string += "\n"
 
     stacks_string = ""
-    for y, row in enumerate(stacks_rows):
+    for y, row in enumerate(stacks_array):
         stacks_string += "stacks{" + str(y) + "}={" + ",".join(row) + "}\n"
 
     jdf_string += stacks_string

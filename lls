@@ -177,6 +177,39 @@ parser.add_argument(
     default=None,
     help='Maximum number of dead cells allowed to differ from how they are in the first generation'
 )
+parser.add_argument(
+    '--layer_max_rotor',
+    type=int,
+    default=None,
+    help='Maximum number of rotor cells allowed per layer'
+)
+parser.add_argument(
+    '--layer_shape',
+    default=None,
+    help='Layer shape. Possible values are "column", "row", "diagonal", "back_diagonal", "box", "diamond", and "circle".'
+)
+parser.add_argument(
+    '--layer_center',
+    type=int,
+    nargs=2,
+    default=None,
+    metavar=("COLUMN", "ROW"),
+    help='Center of layers when layer_shape is "box", "diamond", or "circle".'
+)
+parser.add_argument(
+    "--layer_rotor_include_set_cells",
+    action="store_true",
+    help="Include manually set cells in rotor calculation when using --layer_max_rotor"
+)
+parser.add_argument(
+    '--polyomino',
+    type=int,
+    nargs="?",
+    default=None,
+    const=-1,
+    metavar="MAX_RADIUS",
+    help='Force generation 0 to be a polyomino'
+)
 args = parser.parse_args()
 
 lls_dir = os.path.dirname(os.path.realpath(__file__))
@@ -190,8 +223,41 @@ pattern_output_format = args.csv
 output_file_name = args.output_file_name
 jdf_prefix = args.jdf_prefix
 
-log('Getting search pattern...', 1, 2)
+# Check if input file is a JLS status file and if so, extract settings
+lls_args = []
+jdf_args = None
+subperiod_array = None
+if args.input_file_name:
+    # Check current directory and then search_pattern/
+    if os.path.isfile(args.input_file_name):
+        input_string = src.files.string_from_file(args.input_file_name)
+    elif os.path.isfile(lls_dir + "/search_patterns/" + args.input_file_name):
+        input_string = src.files.string_from_file(lls_dir + "/search_patterns/" + args.input_file_name)
+    else:
+        assert False, "Search pattern file not found"
+    if input_string.startswith("# JavaLifeSearch status file"):
+        log('Getting options from JLS status file "' + args.input_file_name + '" ...', 1)
+        lls_args, jdf_args, subperiod_array = src.formatting.get_jdf_args(input_string)
+        log('Done\n', -1)
+args_from_jdf = parser.parse_args(lls_args)
 
+# Use settings from JLS status file unless overridden by command line input
+args.population += args_from_jdf.population
+if args.rule == None:
+    args.rule = args_from_jdf.rule
+if not args.symmetry:
+    args.symmetry = args_from_jdf.symmetry
+if args.layer_center == None:
+    args.layer_center = args_from_jdf.layer_center
+if args.layer_shape == None:
+    args.layer_shape = args_from_jdf.layer_shape
+if args.layer_max_rotor == None:
+    args.layer_max_rotor = args_from_jdf.layer_max_rotor
+if args.layer_rotor_include_set_cells == None:
+    args.layer_rotor_include_set_cells = args_from_jdf.layer_rotor_include_set_cells
+
+
+log('Getting search pattern...', 1, 2)
 
 
 force_change = []
@@ -411,6 +477,14 @@ if args.max_decay is not None:
     search_pattern.force_max_decay(args.max_decay)
 if args.max_growth is not None:
     search_pattern.force_max_growth(args.max_growth)
+if args.layer_max_rotor is not None:
+    search_pattern.force_layer_max_rotor( args.layer_max_rotor,
+                                          args.layer_shape,
+                                          args.layer_center,
+                                          args.layer_rotor_include_set_cells,
+                                          subperiod_array)
+if args.polyomino is not None:
+    search_pattern.force_polyomino(args.polyomino)
 for times in force_change:
     search_pattern.force_change(times)
 
@@ -471,7 +545,11 @@ while solutions_remaining > 0:
             show_background=show_background
         )
         if jdf_prefix:
-            jdf_string = solution.make_string(pattern_output_format="jdf")
+            jdf_string = solution.make_string(
+                pattern_output_format="jdf",
+                jdf_args=jdf_args,
+                subperiod_array=subperiod_array
+            )
     else:
         output_string = status.value
     log(output_string + "\n", 0, 1)
@@ -480,12 +558,14 @@ while solutions_remaining > 0:
         src.files.append_to_file_from_string(output_file_name, output_string)
         log('Done\n', -1, 2)
     if jdf_string is not None:
+        log('Writing JLS status file...', 1, 2)
         if os.path.isfile(jdf_prefix):
             jdf_prefix = src.files.find_free_file_name(jdf_prefix + "_", "")
         os.makedirs(jdf_prefix, exist_ok=True)
         directory = jdf_prefix + "/"
         save_jdf = src.files.find_free_file_name(jdf_prefix + "_", ".jdf", directory=directory)
         src.files.append_to_file_from_string(directory + save_jdf, jdf_string)
+        log('Done\n', -1, 2)
     if status == Status.SAT and solutions_remaining > 0:
         search_pattern.force_distinct(solution, determined=determined)
     else:

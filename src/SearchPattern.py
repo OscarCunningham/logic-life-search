@@ -11,7 +11,7 @@ from src.ClauseList import ClauseList
 from src.UnsatInPreprocessing import UnsatInPreprocessing
 from src.logging import log
 from src.literal_manipulation import negate, variable_from_literal, neighbours_from_coordinates, implies
-from src.utilities import make_grid
+from src.utilities import make_grid, make_layers
 
 
 class SearchPattern:
@@ -662,6 +662,86 @@ class SearchPattern:
             self.force_at_most(literals, max_growth )
         log("Done\n", -1)
 
+    def force_layer_max_rotor(self, max_rotor, layer_shape, center, include_manually_set_cells, subperiod_array):
+        log("Forcing the pattern to never have more than than " + str(max_rotor) + " rotor cells per layer", 1)
+        width = len(self.grid[0][0])
+        height = len(self.grid[0])
+        duration = len(self.grid)
+
+        layers = make_layers(width, height, layer_shape, center)
+        for layer in layers:
+            literals = []
+            for cell in layer:
+                x, y = cell
+                if x in range(1, width-1) and y in range(1, height-1) and subperiod_array[y-1][x-1] >= 4:
+                    continue
+                first_empty_generation = 0
+                if not include_manually_set_cells:
+                    for t in range(duration):
+                        if self.grid[t][y][x] not in ["0", "1"]:
+                            break
+                    first_empty_generation = t
+                if first_empty_generation >= duration-1:
+                    continue
+                literal = str(x) + "_" + str(y) + "_is_rotor"
+
+                # If all generations of a cell are equal, then it is not a rotor cell.
+                # If include_manually_set_cells is false, then only empty cells are counted.
+                self.clauses.append(implies([self.grid[t][y][x] for t in range(duration) if include_manually_set_cells or self.grid[t][y][x] not in ["0", "1"]], negate(literal)))
+                self.clauses.append(implies([negate(self.grid[t][y][x]) for t in range(duration)  if include_manually_set_cells or self.grid[t][y][x] not in ["0", "1"]], negate(literal)))
+
+                # If any generation of a cell is different from the first empty generation,
+                # then it is a rotor cell. If include_manually_set_cells is false, then only
+                # empty cells are counted.
+                for t in range(first_empty_generation, duration):
+                    if not include_manually_set_cells and self.grid[t][y][x] in ["0", "1"]:
+                        continue
+                    self.clauses.append(implies([self.grid[t][y][x], negate(self.grid[first_empty_generation][y][x])], literal))
+                    self.clauses.append(implies([negate(self.grid[t][y][x]), self.grid[first_empty_generation][y][x]], literal))
+                literals.append(literal)
+            self.force_at_most(literals, max_rotor)
+        log("Done\n", -1)
+
+    def force_polyomino(self, max_radius):
+        log("Forcing the pattern to be a polyomino in generation 0", 1)
+        width = len(self.grid[0][0])
+        height = len(self.grid[0])
+
+        # If no value was given for max_radius, use width*height-1.
+        if max_radius < 0:
+            max_radius = width*height-1;
+
+        # Set a cell to be our base cell for the polynomial. max_radius is the maximum
+        # distance within the polyomino between this cell and any other polyomino cell.
+        self.force_exactly([str(x) + "_" + str(y) + "_within_distance_" + str(0) for x in range(width) for y in range(height)],1)
+
+        # The base polyomino cell must be ON.
+        for x in range(width):
+            for y in range(height):
+                self.clauses.append(implies([str(x) + "_" + str(y) + "_within_distance_" + str(0)], self.grid[0][y][x]))
+
+        # For each distance d, "x_y_within_distance_d" indicates whether the cell
+        # at (x,y) is within distance d (traversed through the polyomino) of the
+        # base polyomino cell
+        for d in range(1,max_radius+1):
+            for x in range(width):
+                for y in range(height):
+                    literal = str(x) + "_" + str(y) + "_within_distance_" + str(d)
+                    self.clauses.append(implies([negate(self.grid[0][y][x])], negate(literal)))
+                    self.clauses.append(implies([negate(str(x) + "_" + str(y) + "_within_distance_" + str(d-1)),
+                                                 negate(str(x-1) + "_" + str(y) + "_within_distance_" + str(d-1)),
+                                                 negate(str(x+1) + "_" + str(y) + "_within_distance_" + str(d-1)),
+                                                 negate(str(x) + "_" + str(y-1) + "_within_distance_" + str(d-1)),
+                                                 negate(str(x) + "_" + str(y+1) + "_within_distance_" + str(d-1))], negate(literal)))
+
+        # A cell is on in generation 0 if and only if it is part of the polyomino
+        # (i.e., is within distance max_radius of the base polyomino cell)
+        for x in range(width):
+            for y in range(height):
+                self.clauses.append(implies([self.grid[0][y][x]], str(x) + "_" + str(y) + "_within_distance_" + str(max_radius)))
+                self.clauses.append(implies([str(x) + "_" + str(y) + "_within_distance_" + str(max_radius)], self.grid[0][y][x]))
+        log("Done\n", -1)
+
     def force_equal(self, argument_0, argument_1=None):
 
         if argument_1 is not None:
@@ -763,7 +843,7 @@ class SearchPattern:
 
         self.clauses.append(clause)
 
-    def make_string(self, pattern_output_format=None, determined=None, show_background=None):
+    def make_string(self, pattern_output_format=None, determined=None, show_background=None, jdf_args=None, subperiod_array=None):
         if pattern_output_format is None:
             pattern_output_format = settings.pattern_output_format
 
@@ -795,7 +875,11 @@ class SearchPattern:
                 show_background=show_background
             )
         elif pattern_output_format == "jdf":
-            output_string = src.formatting.make_jdf(self.grid)
+            output_string = src.formatting.make_jdf(
+                self.grid,
+                jdf_args,
+                subperiod_array
+            )
         else:
             raise Exception
 
